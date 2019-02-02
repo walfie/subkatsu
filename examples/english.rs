@@ -1,6 +1,6 @@
 use std::env;
 
-fn main() {
+fn main() -> Result<(), Box<std::error::Error>> {
     let paths = env::args().skip(1);
 
     if paths.len() == 0 {
@@ -60,4 +60,6 @@ fn main() {
         println!("{}", chain.generate().join(" "));
         println!("\n=====\n");
     }
+
+    Ok(())
 }

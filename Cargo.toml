@@ -8,5 +8,10 @@ edition = "2018"
 markov = "1.0"
 srtparse = "0.1"
 tinysegmenter = "0.1"
-subparse = "0.4.0"
-regex = "1.1.0"
+subparse = "0.4"
+regex = "1.1"
+
+[dev-dependencies]
+env_logger = "0.6.0"
+structopt = "0.2.14"
+log = "0.4.6"
