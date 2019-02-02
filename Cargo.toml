@@ -1,0 +1,12 @@
+[package]
+name = "subkatsu"
+version = "0.1.0"
+authors = ["Walfie <walfington@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+markov = "1.0"
+srtparse = "0.1"
+tinysegmenter = "0.1"
+subparse = "0.4.0"
+regex = "1.1.0"
