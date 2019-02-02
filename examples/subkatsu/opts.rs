@@ -38,7 +38,14 @@ pub struct Train {
 
 #[derive(Debug, StructOpt)]
 pub struct Generate {
+    #[structopt(help = "A model file generated from the training phase")]
     pub model: String,
-    #[structopt(short = "n", default_value = "1")]
+    #[structopt(
+        short = "n",
+        default_value = "10",
+        help = "Number of chains to generate"
+    )]
     pub count: u32,
+    #[structopt(long = "start", help = "Generate chains starting with this token")]
+    pub start: Option<String>,
 }

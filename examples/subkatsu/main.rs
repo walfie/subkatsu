@@ -23,7 +23,19 @@ fn generate(args: opts::Generate) -> Result<(), Box<std::error::Error>> {
     info!("Loaded model from `{}`", args.model);
 
     for _ in 0..args.count {
-        println!("{}", chain.generate().join(" "));
+        let generated = match args.start.clone() {
+            Some(start_token) => chain.generate_from_token(start_token),
+            None => chain.generate(),
+        };
+
+        if generated.is_empty() && args.start.is_some() {
+            error!("Token `{}` was not found in the model", args.start.unwrap());
+
+            // TODO: Maybe return Error instead of exiting here
+            std::process::exit(1);
+        }
+
+        println!("{}", generated.join(" "));
     }
 
     Ok(())

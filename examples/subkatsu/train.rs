@@ -30,8 +30,10 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
     let spaces = regex::Regex::new(r"\\N|\\n|\\h")?;
 
     for path in args.input {
+        // TODO: Emit warning on read/parse failure, rather than exiting
         let format = subparse::get_subtitle_format_by_ending_err(&path)?;
 
+        // TODO: Remove `Comment: ` lines
         let file = std::fs::read_to_string(&path)?;
 
         let subs = subparse::parse_str(format, &file, 24.0)?.get_subtitle_entries()?;
@@ -49,6 +51,8 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
         }
     }
 
-    chain.save(args.output)?;
+    chain.save(&args.output)?;
+    info!("Model saved to `{}`", args.output);
+
     Ok(())
 }
