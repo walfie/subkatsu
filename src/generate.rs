@@ -10,40 +10,59 @@ pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
 
     let chain: Chain<String> = Chain::load(&args.model).context("failed to load model file")?;
 
+    let start = args.start.as_ref().map(|s| s.as_ref());
+
     for _ in 0..args.count {
-        let generated = match args.start.clone() {
-            Some(start_token) => chain.generate_from_token(start_token),
-            None => chain.generate(),
-        };
+        let mut output = generate_single(log, &chain, start)?;
 
-        if generated.is_empty() && args.start.is_some() {
-            slog::error!(
-                log,
-                "Token was not found in the model \
-                (note that the `--start` param only works for models with order = 1)";
-                "token" => &args.start.unwrap()
-            );
-            return Err(Error::context("failed to generate chain from start token"));
+        if let Some(min_length) = args.min_length {
+            while output.chars().count() < min_length {
+                output.push(' ');
+                output.push_str(&generate_single(log, &chain, None)?);
+            }
         }
-
-        let (pre, post) = balance_symbols(&generated);
-
-        let mut output = {
-            let size = generated.iter().fold(0, |acc, v| acc + v.len() + 1);
-            String::with_capacity(size)
-        };
-
-        let tokens_iter = pre
-            .into_iter()
-            .chain(generated.into_iter())
-            .chain(post.into_iter().rev().map(String::from));
-
-        write_tokens(tokens_iter, &mut output).context("failed to write tokens to output")?;
 
         println!("{}", output);
     }
 
     Ok(())
+}
+
+fn generate_single(
+    log: &Logger,
+    chain: &Chain<String>,
+    start_token: Option<&str>,
+) -> Result<String> {
+    let generated = match start_token {
+        Some(start_token) => chain.generate_from_token(start_token.to_owned()),
+        None => chain.generate(),
+    };
+
+    if generated.is_empty() && start_token.is_some() {
+        slog::error!(
+            log,
+            "Token was not found in the model \
+            (note that the `--start` param only works for models with order = 1)";
+            "token" => &start_token.unwrap()
+        );
+        return Err(Error::context("failed to generate chain from start token"));
+    }
+
+    let (pre, post) = balance_symbols(&generated);
+
+    let mut output = {
+        let size = generated.iter().fold(0, |acc, v| acc + v.len() + 1);
+        String::with_capacity(size)
+    };
+
+    let tokens_iter = pre
+        .into_iter()
+        .chain(generated.into_iter())
+        .chain(post.into_iter().rev().map(String::from));
+
+    write_tokens(tokens_iter, &mut output).context("failed to write tokens to output")?;
+
+    Ok(output)
 }
 
 fn balance_symbols<T: AsRef<str>>(
