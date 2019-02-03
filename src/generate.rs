@@ -62,6 +62,11 @@ fn generate_single(
 
     write_tokens(tokens_iter, &mut output).context("failed to write tokens to output")?;
 
+    // TODO: This seems kinda hacky
+    if output.ends_with(" \"\"") {
+        output.truncate(output.len() - 3);
+    }
+
     Ok(output)
 }
 
