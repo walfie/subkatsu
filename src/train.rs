@@ -1,3 +1,4 @@
+use crate::error::*;
 use crate::opts;
 use lazy_static::lazy_static;
 use log::*;
@@ -34,7 +35,7 @@ fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
-pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
+pub fn train(args: opts::Train) -> Result<()> {
     let mut chain = markov::Chain::of_order(args.order);
 
     // {\c&H........&} changes color. If the alpha starts with F, the text
@@ -48,20 +49,25 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
         | \{.+?}                        # Anything between {}'s is a comment
         )
         ",
-    )?;
+    )
+    .unwrap();
 
-    let spaces = Regex::new(r"\\N|\\n|\\h|\n")?;
+    let spaces = Regex::new(r"\\N|\\n|\\h|\n").unwrap();
 
     for path in args.input {
+        info!("Processing `{}`", path);
+
         // TODO: Emit warning on read/parse failure, rather than exiting
-        let format = subparse::get_subtitle_format_by_ending_err(&path)?;
+        let format = subparse::get_subtitle_format_by_ending_err(&path)
+            .context("failed to determine subtitle format")?;
 
         // TODO: Remove `Comment: ` lines
-        let file = std::fs::read_to_string(&path)?;
+        let file = std::fs::read_to_string(&path).context("failed to read file")?;
 
-        let subs = subparse::parse_str(format, &file, 24.0)?.get_subtitle_entries()?;
-
-        info!("Processing `{}`", path);
+        let subs = subparse::parse_str(format, &file, 24.0)
+            .context("failed to parse subtitle file")?
+            .get_subtitle_entries()
+            .context("failed to get subtitle entries")?;
 
         for entry in subs {
             if let Some(line) = entry.line {
@@ -74,8 +80,10 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
         }
     }
 
-    chain.save(&args.output)?;
-    info!("Model saved to `{}`", args.output);
+    info!("Saving model to file `{}`", args.output);
+    chain
+        .save(&args.output)
+        .context("failed to save model file")?;
 
     Ok(())
 }

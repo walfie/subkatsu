@@ -1,13 +1,13 @@
+use crate::error::*;
 use crate::opts;
 use lazy_static::lazy_static;
 use log::*;
 use markov::Chain;
 use std::collections::HashMap;
 
-pub fn generate(args: opts::Generate) -> Result<(), Box<std::error::Error>> {
-    let chain: Chain<String> = Chain::load(&args.model)?;
-
-    info!("Loaded model from `{}`", args.model);
+pub fn generate(args: opts::Generate) -> Result<()> {
+    info!("Loading model from file `{}`", args.model);
+    let chain: Chain<String> = Chain::load(&args.model).context("failed to load model file")?;
 
     for _ in 0..args.count {
         let generated = match args.start.clone() {
@@ -34,7 +34,7 @@ pub fn generate(args: opts::Generate) -> Result<(), Box<std::error::Error>> {
             .chain(generated.into_iter())
             .chain(post.into_iter().rev().map(String::from));
 
-        write_tokens(tokens_iter, &mut output)?;
+        write_tokens(tokens_iter, &mut output).context("failed to write tokens to output")?;
 
         println!("{}", output);
     }
@@ -101,7 +101,7 @@ fn balance_symbols<T: AsRef<str>>(
 fn write_tokens<T: AsRef<str>>(
     tokens: impl IntoIterator<Item = T>,
     output: &mut impl std::fmt::Write,
-) -> Result<(), std::fmt::Error> {
+) -> std::fmt::Result {
     let mut iter = tokens.into_iter();
     let first = match iter.next() {
         Some(first) => first,
