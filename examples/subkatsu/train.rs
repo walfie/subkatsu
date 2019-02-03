@@ -3,27 +3,35 @@ use lazy_static::lazy_static;
 use log::*;
 use regex::Regex;
 
+lazy_static! {
+    static ref IS_CJK: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
+    static ref ENGLISH: Regex = Regex::new(r#"([^\s\w]+)?([a-zA-Z'-]+)([^\s\w]+?)?(")?"#).unwrap();
+}
+
+pub fn is_cjk(text: &str) -> bool {
+    IS_CJK.is_match(text)
+}
+
 fn tokenize(text: &str) -> Vec<String> {
-    lazy_static! {
-        static ref IS_JAPANESE: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
-        static ref ENGLISH: Regex =
-            Regex::new(r#"([^\s\w]+)?([a-zA-Z'-]+)([^\s\w]+?)?(")?"#).unwrap();
-    }
+    let mut tokens = Vec::new();
 
-    if IS_JAPANESE.is_match(text) {
-        return tinysegmenter::tokenize(text);
+    if is_cjk(text) {
+        for token in tinysegmenter::tokenize(text) {
+            match token.trim() {
+                "" => tokens.push(token),
+                s => tokens.push(s.to_owned()),
+            }
+        }
     } else {
-        let mut tokens = Vec::new();
-
         // TODO: Case sensitivity?
         for capture in ENGLISH.captures_iter(text) {
             for matched in capture.iter().skip(1).flatten() {
                 tokens.push(matched.as_str().to_owned());
             }
         }
-
-        return tokens;
     }
+
+    tokens
 }
 
 pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
