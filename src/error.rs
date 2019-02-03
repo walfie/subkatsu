@@ -9,14 +9,15 @@ pub struct Error {
     cause: Option<Box<StdError + 'static>>,
 }
 
+impl Error {
+    pub fn iter(&self) -> ErrorIter {
+        ErrorIter::new(self)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.context)?;
-        if let Some(cause) = self.cause() {
-            write!(f, "\nCaused by: {}", cause)?;
-        }
-
-        Ok(())
+        write!(f, "{}", self.context)
     }
 }
 
@@ -25,6 +26,29 @@ impl StdError for Error {
         self.cause
             .as_ref()
             .map(|boxed| boxed.as_ref() as &(dyn StdError + 'static))
+    }
+}
+
+#[derive(Debug)]
+pub struct ErrorIter<'a>(Option<&'a dyn StdError>);
+
+impl<'a> ErrorIter<'a> {
+    pub fn new(err: &'a dyn StdError) -> Self {
+        ErrorIter(Some(err))
+    }
+}
+
+impl<'a> Iterator for ErrorIter<'a> {
+    type Item = &'a dyn StdError;
+
+    fn next(&mut self) -> Option<&'a dyn StdError> {
+        match self.0.take() {
+            Some(e) => {
+                self.0 = e.cause();
+                Some(e)
+            }
+            None => None,
+        }
     }
 }
 

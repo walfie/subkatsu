@@ -10,8 +10,13 @@ use structopt::StructOpt;
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    if let Err(e) = run() {
-        log::error!("Error: {}", e);
+    if let Err(err) = run() {
+        log::error!("Error: {}", err);
+
+        for cause in err.iter().skip(1) {
+            log::error!("caused by: {}", cause);
+        }
+
         std::process::exit(1);
     }
 }
