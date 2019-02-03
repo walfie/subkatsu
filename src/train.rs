@@ -1,8 +1,8 @@
 use crate::error::*;
 use crate::opts;
 use lazy_static::lazy_static;
-use log::*;
 use regex::Regex;
+use slog::Logger;
 
 lazy_static! {
     static ref IS_CJK: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
@@ -35,7 +35,7 @@ fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
-pub fn train(args: opts::Train) -> Result<()> {
+pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     let mut chain = markov::Chain::of_order(args.order);
 
     // {\c&H........&} changes color. If the alpha starts with F, the text
@@ -55,7 +55,7 @@ pub fn train(args: opts::Train) -> Result<()> {
     let spaces = Regex::new(r"\\N|\\n|\\h|\n").unwrap();
 
     for path in args.input {
-        info!("Processing `{}`", path);
+        slog::info!(log, "Processing file"; "path" => &path);
 
         // TODO: Emit warning on read/parse failure, rather than exiting
         let format = subparse::get_subtitle_format_by_ending_err(&path)
@@ -80,7 +80,7 @@ pub fn train(args: opts::Train) -> Result<()> {
         }
     }
 
-    info!("Saving model to file `{}`", args.output);
+    slog::info!(log, "Saving model to file"; "path" => &args.output);
     chain
         .save(&args.output)
         .context("failed to save model file")?;

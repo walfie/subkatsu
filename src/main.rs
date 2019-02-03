@@ -5,26 +5,40 @@ pub mod train;
 
 use error::*;
 use opts::Opts;
+use slog::{Drain, Logger};
 use structopt::StructOpt;
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let exit_code = run();
 
-    if let Err(err) = run() {
-        log::error!("Error: {}", err);
-
-        for cause in err.iter().skip(1) {
-            log::error!("caused by: {}", cause);
-        }
-
-        std::process::exit(1);
-    }
+    std::process::exit(exit_code)
 }
 
-fn run() -> Result<()> {
+// This separate method is needed for slog_async to flush properly
+fn run() -> i32 {
+    let decorator = slog_term::TermDecorator::new().build();
+    let drain = slog_term::FullFormat::new(decorator).build().fuse();
+    let drain = slog_async::Async::new(drain).build().fuse();
+
+    let log = slog::Logger::root(drain, slog::o!());
+
+    if let Err(err) = try_run(&log) {
+        slog::error!(log, "Encountered error"; "description" => %err);
+
+        for cause in err.iter().skip(1) {
+            slog::error!(log, "Underlying error"; "description" => %cause);
+        }
+
+        return 1;
+    }
+
+    return 0;
+}
+
+fn try_run(log: &Logger) -> Result<()> {
     match Opts::from_args() {
-        Opts::Train(args) => train::train(args)?,
-        Opts::Generate(args) => generate::generate(args).context("failed to generate chains")?,
+        Opts::Train(args) => train::train(log, args)?,
+        Opts::Generate(args) => generate::generate(log, args)?,
     }
 
     Ok(())

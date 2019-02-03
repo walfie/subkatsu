@@ -5,11 +5,18 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
-    context: String,
-    cause: Option<Box<StdError + 'static>>,
+    pub context: String,
+    pub cause: Option<Box<StdError + 'static>>,
 }
 
 impl Error {
+    pub fn context<S: Into<String>>(text: S) -> Self {
+        Error {
+            context: text.into(),
+            cause: None,
+        }
+    }
+
     pub fn iter(&self) -> ErrorIter {
         ErrorIter::new(self)
     }

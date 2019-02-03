@@ -1,12 +1,13 @@
 use crate::error::*;
 use crate::opts;
 use lazy_static::lazy_static;
-use log::*;
 use markov::Chain;
+use slog::Logger;
 use std::collections::HashMap;
 
-pub fn generate(args: opts::Generate) -> Result<()> {
-    info!("Loading model from file `{}`", args.model);
+pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
+    slog::info!(log, "Loading model from file"; "path" => &args.model);
+
     let chain: Chain<String> = Chain::load(&args.model).context("failed to load model file")?;
 
     for _ in 0..args.count {
@@ -16,10 +17,13 @@ pub fn generate(args: opts::Generate) -> Result<()> {
         };
 
         if generated.is_empty() && args.start.is_some() {
-            error!("Token `{}` was not found in the model", args.start.unwrap());
-
-            // TODO: Maybe return Error instead of exiting here
-            std::process::exit(1);
+            slog::error!(
+                log,
+                "Token was not found in the model \
+                (note that the `--start` param only works for models with order = 1)";
+                "token" => &args.start.unwrap()
+            );
+            return Err(Error::context("failed to generate chain from start token"));
         }
 
         let (pre, post) = balance_symbols(&generated);
