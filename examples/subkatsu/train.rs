@@ -1,12 +1,21 @@
 use crate::opts;
+use lazy_static::lazy_static;
 use log::*;
+use regex::Regex;
 
-fn tokenize(text: &str) -> impl Iterator<Item = &str> {
-    // TODO: Detect language, handle punctuation, case-sensitivity, etc
-    let tokens = text.split(' ').filter_map(|string| match string.trim() {
-        "" => None,
-        s => Some(s),
-    });
+fn tokenize(text: &str) -> Vec<String> {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r#"([^\s\w]+)?([a-zA-Z'-]+)([^\s\w]+?)?(")?"#).unwrap();
+    }
+
+    // TODO: Detect language, case-sensitivity, etc
+    let mut tokens = Vec::new();
+
+    for capture in RE.captures_iter(text) {
+        for matched in capture.iter().skip(1).flatten() {
+            tokens.push(matched.as_str().to_owned());
+        }
+    }
 
     tokens
 }
@@ -19,7 +28,7 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
     // next color change, or end of line.
     // TODO: Should probably stop trying to clean the subs in code, and
     // just assume the subtitle files themselves are dialogue-only.
-    let escapes = regex::Regex::new(
+    let escapes = Regex::new(
         r"(?x)                          # Whitespace-insignificant mode, for comments
         ( \{.*\\c&H(F|f).(.{6})?&.*}.*(\{.*\\(c|r).+?}|$)
         | \{.+?}                        # Anything between {}'s is a comment
@@ -27,7 +36,7 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
         ",
     )?;
 
-    let spaces = regex::Regex::new(r"\\N|\\n|\\h")?;
+    let spaces = Regex::new(r"\\N|\\n|\\h")?;
 
     for path in args.input {
         // TODO: Emit warning on read/parse failure, rather than exiting
@@ -45,7 +54,7 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
                 let line = escapes.replace_all(&line, "");
                 let line = spaces.replace_all(&line, " ");
 
-                let tokens = tokenize(&line).map(String::from).collect::<Vec<_>>();
+                let tokens = tokenize(&line);
                 chain.feed(tokens);
             }
         }
