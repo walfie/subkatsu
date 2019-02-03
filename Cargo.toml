@@ -5,17 +5,15 @@ authors = ["Walfie <walfington@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-srtparse = "0.1"
 tinysegmenter = "0.1"
 subparse = "0.4"
 regex = "1.1"
+env_logger = "0.6.0"
+structopt = "0.2.14"
+log = "0.4.6"
+lazy_static = "1.2.0"
 
 [dependencies.markov]
 version = "1.0"
 features = ["yaml"]
 
-[dev-dependencies]
-env_logger = "0.6.0"
-structopt = "0.2.14"
-log = "0.4.6"
-lazy_static = "1.2.0"
