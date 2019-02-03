@@ -5,19 +5,25 @@ use regex::Regex;
 
 fn tokenize(text: &str) -> Vec<String> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r#"([^\s\w]+)?([a-zA-Z'-]+)([^\s\w]+?)?(")?"#).unwrap();
+        static ref IS_JAPANESE: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
+        static ref ENGLISH: Regex =
+            Regex::new(r#"([^\s\w]+)?([a-zA-Z'-]+)([^\s\w]+?)?(")?"#).unwrap();
     }
 
-    // TODO: Detect language, case-sensitivity, etc
-    let mut tokens = Vec::new();
+    if IS_JAPANESE.is_match(text) {
+        return tinysegmenter::tokenize(text);
+    } else {
+        let mut tokens = Vec::new();
 
-    for capture in RE.captures_iter(text) {
-        for matched in capture.iter().skip(1).flatten() {
-            tokens.push(matched.as_str().to_owned());
+        // TODO: Case sensitivity?
+        for capture in ENGLISH.captures_iter(text) {
+            for matched in capture.iter().skip(1).flatten() {
+                tokens.push(matched.as_str().to_owned());
+            }
         }
-    }
 
-    tokens
+        return tokens;
+    }
 }
 
 pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
@@ -36,7 +42,7 @@ pub fn train(args: opts::Train) -> Result<(), Box<std::error::Error>> {
         ",
     )?;
 
-    let spaces = Regex::new(r"\\N|\\n|\\h")?;
+    let spaces = Regex::new(r"\\N|\\n|\\h|\n")?;
 
     for path in args.input {
         // TODO: Emit warning on read/parse failure, rather than exiting
