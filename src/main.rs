@@ -1,7 +1,8 @@
+#[macro_use]
+pub mod train;
 pub mod error;
 pub mod generate;
 pub mod opts;
-pub mod train;
 
 use error::*;
 use opts::Opts;

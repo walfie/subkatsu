@@ -4,25 +4,59 @@ use lazy_static::lazy_static;
 use markov::Chain;
 use slog::Logger;
 use std::collections::HashMap;
+use std::io::{stdout, Write};
 
 pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
-    slog::info!(log, "Loading model from file"; "path" => &args.model);
+    let (subtitle_file, mut subtitle_lines, count) = match args.existing_subs {
+        Some(path) => {
+            slog::info!(log, "Loading subtitles from file"; "path" => &path);
+            let file = get_subtitles!(&path)?;
+            let entries = file
+                .get_subtitle_entries()
+                .context("failed to parse subtitle entries")?;
+            let n = entries.len();
+            (Some(file), entries, n)
+        }
+        None => (None, Vec::new(), args.count as usize),
+    };
 
+    slog::info!(log, "Loading model from file"; "path" => &args.model);
     let chain: Chain<String> = Chain::load(&args.model).context("failed to load model file")?;
 
     let start = args.start.as_ref().map(|s| s.as_ref());
 
-    for _ in 0..args.count {
-        let mut output = generate_single(log, &chain, start)?;
+    let mut output = Vec::with_capacity(count);
+
+    for _ in 0..count {
+        let mut line = generate_single(log, &chain, start)?;
 
         if let Some(min_length) = args.min_length {
-            while output.chars().count() < min_length {
-                output.push(' ');
-                output.push_str(&generate_single(log, &chain, None)?);
+            while line.chars().count() < min_length {
+                line.push(' ');
+                line.push_str(&generate_single(log, &chain, None)?);
             }
         }
 
-        println!("{}", output);
+        output.push(line)
+    }
+
+    if let Some(mut file) = subtitle_file {
+        for (mut sub, line) in subtitle_lines.iter_mut().zip(output) {
+            sub.line = Some(line);
+        }
+
+        file.update_subtitle_entries(&subtitle_lines)
+            .context("failed to update subtitle lines")?;
+
+        let data = file
+            .to_data()
+            .context("failed to serialize subtitle data")?;
+
+        stdout().write(&data).context("failed to write to stdout")?;
+    } else {
+        for line in output {
+            println!("{}", line);
+        }
     }
 
     Ok(())

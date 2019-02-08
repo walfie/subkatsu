@@ -64,4 +64,13 @@ pub struct Generate {
         help = "Ensure that generated chains have at least this many characters"
     )]
     pub min_length: Option<usize>,
+
+    #[structopt(
+        long = "existing-subs",
+        conflicts_with = "count",
+        help = "If specified, generates a new subtitles file to stdout, \
+                using the existing file for timing/style reference. \
+                Note this cannot be used with the `count` option."
+    )]
+    pub existing_subs: Option<String>,
 }

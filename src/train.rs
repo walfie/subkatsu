@@ -35,6 +35,20 @@ fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
+// This has to be a macro for now because `subparse::parse_str` returns a private
+// type in its public interface: https://github.com/kaegi/subparse/issues/3
+macro_rules! get_subtitles {
+    ( $path:expr ) => {{
+        let format = subparse::get_subtitle_format_by_ending_err($path)
+            .context("failed to determine subtitle format")?;
+
+        // TODO: Remove `Comment: ` lines
+        let content = &std::fs::read_to_string($path).context("failed to read file")?;
+
+        subparse::parse_str(format, &content, 24.0).context("failed to parse subtitle file")
+    }};
+}
+
 pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     let mut chain = markov::Chain::of_order(args.order);
 
@@ -57,15 +71,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     for path in args.input {
         slog::info!(log, "Processing file"; "path" => &path);
 
-        // TODO: Emit warning on read/parse failure, rather than exiting
-        let format = subparse::get_subtitle_format_by_ending_err(&path)
-            .context("failed to determine subtitle format")?;
-
-        // TODO: Remove `Comment: ` lines
-        let file = std::fs::read_to_string(&path).context("failed to read file")?;
-
-        let subs = subparse::parse_str(format, &file, 24.0)
-            .context("failed to parse subtitle file")?
+        let subs = get_subtitles!(&path)?
             .get_subtitle_entries()
             .context("failed to get subtitle entries")?;
 
