@@ -4,9 +4,9 @@ use lazy_static::lazy_static;
 use markov::Chain;
 use slog::Logger;
 use std::collections::HashMap;
-use std::io::{stdout, Write};
+use std::io::Write;
 
-pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
+pub fn generate(log: &Logger, args: opts::Generate, output: &mut impl Write) -> Result<()> {
     let (subtitle_file, mut subtitle_lines, count) = match args.existing_subs {
         Some(path) => {
             slog::info!(log, "Loading subtitles from file"; "path" => &path);
@@ -25,7 +25,7 @@ pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
 
     let start = args.start.as_ref().map(|s| s.as_ref());
 
-    let mut output = Vec::with_capacity(count);
+    let mut output_lines = Vec::with_capacity(count);
 
     for _ in 0..count {
         let mut line = generate_single(log, &chain, start)?;
@@ -37,11 +37,11 @@ pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
             }
         }
 
-        output.push(line)
+        output_lines.push(line)
     }
 
     if let Some(mut file) = subtitle_file {
-        for (mut sub, line) in subtitle_lines.iter_mut().zip(output) {
+        for (mut sub, line) in subtitle_lines.iter_mut().zip(output_lines) {
             sub.line = Some(line);
         }
 
@@ -52,10 +52,12 @@ pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
             .to_data()
             .context("failed to serialize subtitle data")?;
 
-        stdout().write(&data).context("failed to write to stdout")?;
+        output.write(&data).context("failed to write to output")?;
     } else {
-        for line in output {
-            println!("{}", line);
+        for line in output_lines {
+            output
+                .write(line.as_ref())
+                .context("failed to write to output")?;
         }
     }
 
