@@ -31,6 +31,13 @@ pub struct Train {
     pub order: usize,
 
     #[structopt(
+        long = "recursive",
+        short = "r",
+        help = "Recursively include files in input directories as training files"
+    )]
+    pub recursive: bool,
+
+    #[structopt(
         required = true,
         help = "List of training files to use as input \
                 (should have extensions .srt/.ssa/.ass)"

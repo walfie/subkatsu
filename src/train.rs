@@ -3,6 +3,7 @@ use crate::opts;
 use lazy_static::lazy_static;
 use regex::Regex;
 use slog::Logger;
+use std::path::PathBuf;
 
 lazy_static! {
     static ref IS_CJK: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
@@ -49,6 +50,48 @@ macro_rules! get_subtitles {
     }};
 }
 
+fn iterate_files(
+    log: &Logger,
+    path: String,
+    recursive: bool,
+) -> impl Iterator<Item = PathBuf> + '_ {
+    let paths = walkdir::WalkDir::new(&path);
+    let paths = if recursive { paths } else { paths.max_depth(0) };
+
+    paths.into_iter().filter_map(move |entry| {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(err) => {
+                let path = err
+                    .path()
+                    .map_or("<UNKNOWN>".into(), |p| p.to_string_lossy());
+                let reason = err
+                    .io_error()
+                    .map_or("unknown".to_string(), |e| e.to_string());
+                slog::warn!(
+                    log, "Failed to handle file";
+                    "path" => %path,
+                    "reason" => reason
+                );
+                return None;
+            }
+        };
+
+        if entry.file_type().is_dir() {
+            if !recursive {
+                slog::warn!(
+                    log, "Skipping directory";
+                    "reason" => "--recursive is not specified",
+                    "path" => %entry.path().to_string_lossy()
+                );
+            }
+            return None;
+        } else {
+            return Some(entry.into_path());
+        }
+    })
+}
+
 pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     let mut chain = markov::Chain::of_order(args.order);
 
@@ -67,11 +110,27 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     .unwrap();
 
     let spaces = Regex::new(r"\\N|\\n|\\h|\n").unwrap();
+    let recursive = args.recursive;
 
-    for path in args.input {
-        slog::info!(log, "Processing file"; "path" => &path);
+    let paths = args
+        .input
+        .into_iter()
+        .flat_map(|path| iterate_files(log, path, recursive));
 
-        let subs = get_subtitles!(&path)?
+    let mut processed_files = 0;
+    for path_buf in paths {
+        let path = match path_buf.to_str() {
+            Some(p) => p,
+            None => {
+                slog::warn!(log, "failed to parse path"; "path" => %path_buf.to_string_lossy());
+                continue;
+            }
+        };
+
+        slog::info!(log, "Processing file"; "path" => path);
+
+        // TODO: Don't error, just continue
+        let subs = get_subtitles!(path)?
             .get_subtitle_entries()
             .context("failed to get subtitle entries")?;
 
@@ -84,8 +143,15 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
                 chain.feed(tokens);
             }
         }
+
+        processed_files = processed_files + 1;
     }
 
+    if processed_files == 0 {
+        return Err(Error::context("No files processed"));
+    }
+
+    slog::info!(log, "Processed input files"; "count" => processed_files);
     slog::info!(log, "Saving model to file"; "path" => &args.output);
     chain
         .save(&args.output)

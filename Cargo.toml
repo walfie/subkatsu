@@ -13,6 +13,7 @@ lazy_static = "1.2.0"
 slog = "2.4.1"
 slog-term = "2.4.0"
 slog-async = "2.3.0"
+walkdir = "2.2.7"
 
 [dependencies.markov]
 version = "1.0"
