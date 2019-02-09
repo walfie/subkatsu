@@ -5,33 +5,66 @@ use markov::Chain;
 use slog::Logger;
 use std::collections::HashMap;
 use std::io::Write;
+use subparse::{GenericSubtitleFile, SubtitleFile};
 
-pub fn generate(log: &Logger, args: opts::Generate, output: &mut impl Write) -> Result<()> {
-    let (subtitle_file, mut subtitle_lines, count) = match args.existing_subs {
+pub fn generate_from_opts(
+    log: &Logger,
+    args: opts::Generate,
+    output: &mut impl Write,
+) -> Result<()> {
+    let subtitle_file = match args.existing_subs {
+        None => None,
         Some(path) => {
             slog::info!(log, "Loading subtitles from file"; "path" => &path);
-            let file = get_subtitles!(&path)?;
+            Some(crate::train::get_subtitles(&path)?)
+        }
+    };
+
+    slog::info!(log, "Loading model from file"; "path" => &args.model);
+    let chain = load_model(&args.model)?;
+
+    generate(
+        log,
+        subtitle_file,
+        chain,
+        args.start.as_ref().map(|s| s.as_ref()),
+        args.count,
+        args.min_length,
+        output,
+    )
+}
+
+pub fn load_model(path: &str) -> Result<Chain<String>> {
+    Chain::load(path).context("failed to load model file")
+}
+
+pub fn generate(
+    log: &Logger,
+    subtitle_file: Option<GenericSubtitleFile>,
+    chain: Chain<String>,
+    start: Option<&str>,
+    count: usize,
+    min_length: Option<usize>,
+    output: &mut impl Write,
+) -> Result<()> {
+    let (mut subtitle_lines, count) = match subtitle_file.as_ref() {
+        Some(file) => {
             let entries = file
                 .get_subtitle_entries()
                 .context("failed to parse subtitle entries")?;
             let n = entries.len();
-            (Some(file), entries, n)
+            (entries, n)
         }
-        None => (None, Vec::new(), args.count as usize),
+        None => (Vec::new(), count),
     };
-
-    slog::info!(log, "Loading model from file"; "path" => &args.model);
-    let chain: Chain<String> = Chain::load(&args.model).context("failed to load model file")?;
-
-    let start = args.start.as_ref().map(|s| s.as_ref());
 
     let mut output_lines = Vec::with_capacity(count);
 
     for _ in 0..count {
         let mut line = generate_single(log, &chain, start)?;
 
-        if let Some(min_length) = args.min_length {
-            while line.chars().count() < min_length {
+        if let Some(length) = min_length {
+            while line.chars().count() < length {
                 line.push(' ');
                 line.push_str(&generate_single(log, &chain, None)?);
             }

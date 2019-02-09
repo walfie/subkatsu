@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use slog::Logger;
 use std::path::PathBuf;
+use subparse::{GenericSubtitleFile, SubtitleFile};
 
 lazy_static! {
     static ref IS_CJK: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
@@ -38,16 +39,14 @@ fn tokenize(text: &str) -> Vec<String> {
 
 // This has to be a macro for now because `subparse::parse_str` returns a private
 // type in its public interface: https://github.com/kaegi/subparse/issues/3
-macro_rules! get_subtitles {
-    ( $path:expr ) => {{
-        let format = subparse::get_subtitle_format_by_ending_err($path)
-            .context("failed to determine subtitle format")?;
+pub fn get_subtitles(path: &str) -> Result<GenericSubtitleFile> {
+    let format = subparse::get_subtitle_format_by_ending_err(path)
+        .context("failed to determine subtitle format")?;
 
-        // TODO: Remove `Comment: ` lines
-        let content = &std::fs::read_to_string($path).context("failed to read file")?;
+    // TODO: Remove `Comment: ` lines
+    let content = &std::fs::read_to_string(path).context("failed to read file")?;
 
-        subparse::parse_str(format, &content, 24.0).context("failed to parse subtitle file")
-    }};
+    subparse::parse_str(format, &content, 24.0).context("failed to parse subtitle file")
 }
 
 fn iterate_files(
@@ -130,7 +129,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
 
         // TODO: Don't error, just continue
         let subs: Result<Vec<subparse::SubtitleEntry>> = (|| {
-            Ok(get_subtitles!(path)?
+            Ok(get_subtitles(path)?
                 .get_subtitle_entries()
                 .context("failed to get subtitle entries")?)
         })();

@@ -553,7 +553,7 @@ dependencies = [
  "slog-async 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "subparse 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "subparse 0.4.0 (git+https://github.com/walfie/subparse.git?rev=12fa1f4d9e6e72ad3205f5e1019f1c2527d65f6b)",
  "tinysegmenter 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -561,7 +561,7 @@ dependencies = [
 [[package]]
 name = "subparse"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/walfie/subparse.git?rev=12fa1f4d9e6e72ad3205f5e1019f1c2527d65f6b#12fa1f4d9e6e72ad3205f5e1019f1c2527d65f6b"
 dependencies = [
  "combine 2.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "encoding_rs 0.8.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -800,7 +800,7 @@ dependencies = [
 "checksum strsim 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4f380125926a99e52bc279241539c018323fab05ad6368b56f93d9369ff550"
 "checksum structopt 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)" = "670ad348dc73012fcf78c71f06f9d942232cdd4c859d4b6975e27836c3efc0c3"
 "checksum structopt-derive 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)" = "ef98172b1a00b0bec738508d3726540edcbd186d50dfd326f2b1febbb3559f04"
-"checksum subparse 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "577706a1d45392ec055ffcff1bd2517f4639bb92c5378c1f3edfb65326abd076"
+"checksum subparse 0.4.0 (git+https://github.com/walfie/subparse.git?rev=12fa1f4d9e6e72ad3205f5e1019f1c2527d65f6b)" = "<none>"
 "checksum syn 0.15.26 (registry+https://github.com/rust-lang/crates.io-index)" = "f92e629aa1d9c827b2bb8297046c1ccffc57c99b947a680d3ccff1f136a3bee9"
 "checksum take_mut 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
 "checksum term 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5e6b677dd1e8214ea1ef4297f85dbcbed8e8cdddb561040cc998ca2551c37561"

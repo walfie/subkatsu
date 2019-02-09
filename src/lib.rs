@@ -1,9 +1,8 @@
 pub mod error;
 pub mod opts;
 
-#[macro_use]
-mod train;
 mod generate;
+mod train;
 
-pub use generate::generate;
+pub use generate::{generate, generate_from_opts};
 pub use train::train;
