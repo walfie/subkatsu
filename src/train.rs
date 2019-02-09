@@ -80,7 +80,7 @@ fn iterate_files(
         if entry.file_type().is_dir() {
             if !recursive {
                 slog::warn!(
-                    log, "Skipping directory";
+                    log, "Ignoring directory";
                     "reason" => "--recursive is not specified",
                     "path" => %entry.path().to_string_lossy()
                 );
@@ -118,6 +118,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
         .flat_map(|path| iterate_files(log, path, recursive));
 
     let mut processed_files = 0;
+    let mut skipped_files = 0;
     for path_buf in paths {
         let path = match path_buf.to_str() {
             Some(p) => p,
@@ -127,12 +128,24 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
             }
         };
 
-        slog::info!(log, "Processing file"; "path" => path);
-
         // TODO: Don't error, just continue
-        let subs = get_subtitles!(path)?
-            .get_subtitle_entries()
-            .context("failed to get subtitle entries")?;
+        let subs: Result<Vec<subparse::SubtitleEntry>> = (|| {
+            Ok(get_subtitles!(path)?
+                .get_subtitle_entries()
+                .context("failed to get subtitle entries")?)
+        })();
+
+        let subs = match subs {
+            Ok(s) => s,
+            Err(s) => {
+                slog::warn!(
+                    log, "Skipping file";
+                    "reason" => %s, "path" => path
+                );
+                skipped_files = skipped_files + 1;
+                continue;
+            }
+        };
 
         for entry in subs {
             if let Some(line) = entry.line {
@@ -144,6 +157,8 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
             }
         }
 
+        slog::info!(log, "Processed file"; "path" => path);
+
         processed_files = processed_files + 1;
     }
 
@@ -151,7 +166,10 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
         return Err(Error::context("No files processed"));
     }
 
-    slog::info!(log, "Processed input files"; "count" => processed_files);
+    slog::info!(
+        log, "Processed input files";
+        "skipped" => skipped_files, "count" => processed_files
+    );
     slog::info!(log, "Saving model to file"; "path" => &args.output);
     chain
         .save(&args.output)
