@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
+use subkatsu::error::*;
 
 #[derive(Debug, StructOpt)]
 pub struct Opts {
@@ -41,8 +42,31 @@ pub struct Opts {
     pub save_all: bool,
 
     #[structopt(
-        long = "resolution-ms",
-        help = "Resolution in milliseconds. I.e., 200 means take a maximum of one screenshot every 200 ms"
+        long = "resolution",
+        parse(try_from_str = "parse_duration_ms"),
+        default_value = "1s",
+        help = "Resolution. I.e., 200ms means take a maximum of one screenshot every 200 ms"
     )]
-    pub resolution_ms: Option<u32>,
+    pub resolution_ms: u32,
+}
+
+fn parse_duration_ms(s: &str) -> Result<u32> {
+    fn trim(s: &str, suffix: &str, multiplier: u32) -> Option<u32> {
+        if s.ends_with(suffix) {
+            s.trim_end_matches(suffix)
+                .parse::<u32>()
+                .map(|i| i * multiplier)
+                .ok()
+        } else {
+            None
+        }
+    }
+
+    s.parse::<u32>()
+        .ok()
+        .or_else(|| trim(s, "ms", 1))
+        .or_else(|| trim(s, "s", 1_000))
+        .or_else(|| trim(s, "m", 60_000))
+        .or_else(|| trim(s, "h", 3_600_000))
+        .ok_or_else(|| Error::context("failed to parse duration"))
 }

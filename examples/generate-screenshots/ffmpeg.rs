@@ -33,7 +33,7 @@ pub fn save_screenshots(
     subtitles: &GenericSubtitleFile,
     output_dir: &PathBuf,
     count: Option<usize>,
-    resolution_ms: Option<u32>,
+    resolution_ms: u32,
 ) -> Result<()> {
     let mut tmp_subs_file =
         tempfile::NamedTempFile::new().context("failed to create temporary file")?;
@@ -58,19 +58,17 @@ pub fn save_screenshots(
             .get_subtitle_entries()
             .context("failed to get subtitle entries")?;
 
-        if let Some(resolution) = resolution_ms {
-            let resolution = resolution as i64;
-            if resolution > 0 {
-                // Lines that happen in the same interval will only get
-                // one screenshot (chosen at random)
-                subtitle_entries.sort_unstable_by_key(|e| {
-                    (
-                        (e.timespan.start.msecs() / resolution),
-                        rand::random::<u8>(),
-                    )
-                });
-                subtitle_entries.dedup_by_key(|e| e.timespan.start.msecs() / resolution);
-            }
+        let resolution_ms = resolution_ms as i64;
+        if resolution_ms > 0 {
+            // Lines that happen in the same interval will only get
+            // one screenshot (chosen at random)
+            subtitle_entries.sort_unstable_by_key(|e| {
+                (
+                    (e.timespan.start.msecs() / resolution_ms),
+                    rand::random::<u8>(),
+                )
+            });
+            subtitle_entries.dedup_by_key(|e| e.timespan.start.msecs() / resolution_ms);
         }
 
         let entries_with_ts = get_random_timestamps(subtitle_entries).collect::<Vec<_>>();
