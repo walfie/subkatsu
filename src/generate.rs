@@ -1,5 +1,6 @@
 use crate::error::*;
 use crate::opts;
+use crate::train::tokenize;
 use lazy_static::lazy_static;
 use markov::Chain;
 use slog::Logger;
@@ -61,12 +62,13 @@ pub fn generate_subtitle_file(
         .get_subtitle_entries()
         .context("failed to parse subtitle entries")?;
 
-    let mut generated: HashMap<String, String> = HashMap::new();
+    // Lines that have the same tokenized output should get the same generated string
+    let mut generated: HashMap<Vec<String>, String> = HashMap::new();
 
     for mut subtitle in subtitle_entries.iter_mut() {
         if let Some(line) = subtitle.line.take() {
             if !line.is_empty() {
-                match generated.entry(line) {
+                match generated.entry(tokenize(&line)) {
                     Entry::Occupied(e) => {
                         subtitle.line = Some(e.get().to_owned());
                     }

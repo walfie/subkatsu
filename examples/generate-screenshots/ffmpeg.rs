@@ -51,20 +51,20 @@ pub fn save_screenshots(
         .context("failed to write subtitles to file")?;
     let tmp_subs_path = tmp_subs_file.path().to_string_lossy();
 
+    let mut rng = rand::thread_rng();
     let entries_with_timestamps = {
-        let subtitle_entries = subtitles
+        let mut subtitle_entries = subtitles
             .get_subtitle_entries()
             .context("failed to get subtitle entries")?;
 
-        let mut entries_with_ts = get_random_timestamps(subtitle_entries).collect::<Vec<_>>();
+        // Lines that start in the same second will only get one screenshot
+        subtitle_entries.sort_unstable_by_key(|e| e.timespan.start.secs());
+        subtitle_entries.dedup_by_key(|e| e.timespan.start.secs());
 
-        // Lines that occur in the same second will only get one screenshot
-        entries_with_ts.sort_unstable_by_key(|(_, t)| t.secs());
-        entries_with_ts.dedup_by_key(|(_, t)| t.secs());
+        let entries_with_ts = get_random_timestamps(subtitle_entries).collect::<Vec<_>>();
 
         // Take a subset of the subtitles
         if let Some(c) = count {
-            let mut rng = rand::thread_rng();
             entries_with_ts
                 .choose_multiple(&mut rng, c)
                 .cloned()
@@ -124,8 +124,10 @@ pub fn get_random_timestamps(
 ) -> impl Iterator<Item = (String, TimePoint)> {
     let mut rng = rand::thread_rng();
 
-    subs.into_iter().filter_map(move |entry| {
-        if let Some(line) = entry.line {
+    subs.into_iter().filter_map(move |entry| match entry.line {
+        None => None,
+        Some(ref line) if line.trim().is_empty() => None,
+        Some(line) => {
             let mut start = entry.timespan.start.msecs();
             let mut end = entry.timespan.end.msecs();
             if start > end {
@@ -134,8 +136,6 @@ pub fn get_random_timestamps(
             let timepoint = TimePoint::from_msecs(rng.gen_range(start, end));
 
             Some((line, timepoint))
-        } else {
-            None
         }
     })
 }

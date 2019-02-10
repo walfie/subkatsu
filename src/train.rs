@@ -17,7 +17,7 @@ pub fn is_cjk(text: &str) -> bool {
     IS_CJK.is_match(text)
 }
 
-fn tokenize(text: &str) -> Vec<String> {
+pub fn tokenize(text: &str) -> Vec<String> {
     let mut tokens = Vec::new();
 
     if is_cjk(text) {
