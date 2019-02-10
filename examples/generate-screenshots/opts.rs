@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -20,4 +21,7 @@ pub struct Opts {
                 If unspecified, will attempt to extract subtitles from the video file"
     )]
     pub subtitles: Option<String>,
+
+    #[structopt(long = "output-dir", help = "Path to save screenshots to")]
+    pub output_dir: PathBuf,
 }

@@ -20,5 +20,10 @@ rev = "12fa1f4d9e6e72ad3205f5e1019f1c2527d65f6b"
 
 [dependencies.markov]
 version = "1.0"
+default-features = false
 features = ["yaml"]
+
+[dev-dependencies]
+rand = "0.6.5"
+tempfile = "3.0.6"
 

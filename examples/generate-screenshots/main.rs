@@ -5,6 +5,7 @@ use opts::Opts;
 use slog::{Drain, Logger};
 use structopt::StructOpt;
 use subkatsu::error::*;
+use subparse::SubtitleFile;
 
 fn main() {
     // Logger initialization boilerplate
@@ -62,8 +63,15 @@ fn run(log: &Logger) -> Result<()> {
         &mut new_subs,
     )?;
 
-    // TODO
-    println!("{}", String::from_utf8(new_subs).context("Invalid UTF-8")?);
+    let subtitle_entries = subtitles_file
+        .get_subtitle_entries()
+        .context("failed to get subtitle entries")?;
 
-    Ok(())
+    ffmpeg::save_screenshots(
+        log,
+        &opts.video,
+        &new_subs,
+        ffmpeg::get_random_timestamps(subtitle_entries),
+        &opts.output_dir,
+    )
 }
