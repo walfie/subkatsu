@@ -2,11 +2,9 @@ mod ffmpeg;
 mod opts;
 
 use opts::Opts;
-use rand::seq::IteratorRandom;
 use slog::{Drain, Logger};
 use structopt::StructOpt;
 use subkatsu::error::*;
-use subparse::SubtitleFile;
 
 fn main() {
     // Logger initialization boilerplate
@@ -56,33 +54,13 @@ fn run(log: &Logger) -> Result<()> {
     slog::info!(log, "Loading model from file"; "path" => &opts.model);
     let model = subkatsu::load_model(&opts.model)?;
 
-    let mut new_subs = Vec::new();
-    subkatsu::generate(
-        &log,
-        Some(&mut subtitles_file),
-        model,
-        None,
-        0, // Unused
-        opts.min_length,
-        &mut new_subs,
-    )?;
-
-    let subtitle_entries = subtitles_file
-        .get_subtitle_entries()
-        .context("failed to get subtitle entries")?;
-
-    let mut timestamps = ffmpeg::get_random_timestamps(subtitle_entries).collect::<Vec<_>>();
-
-    if let Some(count) = opts.count {
-        let mut rng = rand::thread_rng();
-        timestamps = timestamps.into_iter().choose_multiple(&mut rng, count);
-    }
+    subkatsu::generate_subtitle_file(&log, &mut subtitles_file, model, None, opts.min_length)?;
 
     ffmpeg::save_screenshots(
         log,
         &opts.video,
-        &new_subs,
-        timestamps.into_iter(),
+        &subtitles_file,
         &opts.output_dir,
+        opts.count,
     )
 }

@@ -12,7 +12,7 @@ pub fn generate_from_opts(
     args: opts::Generate,
     output: &mut impl Write,
 ) -> Result<()> {
-    let mut subtitle_file = match args.existing_subs {
+    let subtitle_file = match args.existing_subs {
         None => None,
         Some(path) => {
             slog::info!(log, "Loading subtitles from file"; "path" => &path);
@@ -23,55 +23,10 @@ pub fn generate_from_opts(
     slog::info!(log, "Loading model from file"; "path" => &args.model);
     let chain = load_model(&args.model)?;
 
-    generate(
-        log,
-        subtitle_file.as_mut(),
-        chain,
-        args.start.as_ref().map(|s| s.as_ref()),
-        args.count,
-        args.min_length,
-        output,
-    )
-}
+    let start = args.start.as_ref().map(|s| s.as_ref());
 
-pub fn load_model(path: &str) -> Result<Chain<String>> {
-    Chain::load(path).context("failed to load model file")
-}
-
-pub fn generate(
-    log: &Logger,
-    subtitle_file: Option<&mut GenericSubtitleFile>,
-    chain: Chain<String>,
-    start: Option<&str>,
-    count: usize,
-    min_length: Option<usize>,
-    output: &mut impl Write,
-) -> Result<()> {
-    let (mut subtitle_lines, count) = match subtitle_file.as_ref() {
-        Some(file) => {
-            let entries = file
-                .get_subtitle_entries()
-                .context("failed to parse subtitle entries")?;
-            let n = entries.len();
-            (entries, n)
-        }
-        None => (Vec::new(), count),
-    };
-
-    let mut output_lines = Vec::with_capacity(count);
-
-    for _ in 0..count {
-        let line = generate_min_length(log, &chain, start, min_length)?;
-        output_lines.push(line)
-    }
-
-    if let Some(file) = subtitle_file {
-        for (mut sub, line) in subtitle_lines.iter_mut().zip(output_lines) {
-            sub.line = Some(line);
-        }
-
-        file.update_subtitle_entries(&subtitle_lines)
-            .context("failed to update subtitle lines")?;
+    if let Some(mut file) = subtitle_file {
+        generate_subtitle_file(&log, &mut file, chain, start, args.min_length)?;
 
         let data = file
             .to_data()
@@ -79,9 +34,10 @@ pub fn generate(
 
         output.write(&data).context("failed to write to output")?;
     } else {
-        for line in output_lines {
+        let lines = generate_lines(&log, chain, start, args.min_length);
+        for line in lines.take(args.count) {
             output
-                .write(line.as_ref())
+                .write(line?.as_ref())
                 .context("failed to write to output")?;
         }
     }
@@ -89,7 +45,46 @@ pub fn generate(
     Ok(())
 }
 
-fn generate_min_length(
+pub fn load_model(path: &str) -> Result<Chain<String>> {
+    Chain::load(path).context("failed to load model file")
+}
+
+pub fn generate_subtitle_file(
+    log: &Logger,
+    subtitle_file: &mut GenericSubtitleFile,
+    chain: Chain<String>,
+    start: Option<&str>,
+    min_length: Option<usize>,
+) -> Result<()> {
+    let mut subtitle_entries = subtitle_file
+        .get_subtitle_entries()
+        .context("failed to parse subtitle entries")?;
+
+    for mut entry in subtitle_entries.iter_mut() {
+        if let Some(line) = &entry.line {
+            if !line.is_empty() {
+                entry.line = Some(generate_line(log, &chain, start, min_length)?);
+            } else {
+                entry.line = None;
+            }
+        }
+    }
+
+    subtitle_file
+        .update_subtitle_entries(&subtitle_entries)
+        .context("failed to update subtitle lines")
+}
+
+pub fn generate_lines<'a>(
+    log: &'a Logger,
+    chain: Chain<String>,
+    start: Option<&'a str>,
+    min_length: Option<usize>,
+) -> impl Iterator<Item = Result<String>> + 'a {
+    std::iter::repeat_with(move || generate_line(log, &chain, start, min_length))
+}
+
+pub fn generate_line(
     log: &Logger,
     chain: &Chain<String>,
     start_token: Option<&str>,

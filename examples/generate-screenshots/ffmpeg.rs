@@ -1,3 +1,4 @@
+use rand::seq::IteratorRandom;
 use rand::Rng;
 use slog::Logger;
 use std::io::Write;
@@ -5,6 +6,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use subkatsu::error::*;
 use subparse::timetypes::TimePoint;
+use subparse::{GenericSubtitleFile, SubtitleFile};
 use subparse::{SubtitleEntry, SubtitleFormat};
 
 pub fn get_subtitles_from_video(log: &Logger, path: &str) -> Result<(Vec<u8>, SubtitleFormat)> {
@@ -27,25 +29,45 @@ pub fn get_subtitles_from_video(log: &Logger, path: &str) -> Result<(Vec<u8>, Su
 
 pub fn save_screenshots(
     log: &Logger,
-    video: &str,
-    subtitles: &[u8],
-    timestamps: impl Iterator<Item = TimePoint>,
+    video_path: &str,
+    subtitles: &GenericSubtitleFile,
     output_dir: &PathBuf,
+    count: Option<usize>,
 ) -> Result<()> {
-    let mut subs_file =
+    let mut tmp_subs_file =
         tempfile::NamedTempFile::new().context("failed to create temporary file")?;
 
     slog::info!(
         log, "Writing subtitles to temporary file";
-        "path" => %subs_file.path().to_string_lossy()
+        "path" => %tmp_subs_file.path().to_string_lossy()
     );
 
-    subs_file
-        .write(subtitles)
-        .context("failed to write subtitles to file")?;
-    let subtitles_path = subs_file.path().to_string_lossy();
+    let subtitles_data = subtitles
+        .to_data()
+        .context("failed to serialize subtitle data")?;
 
-    for ts in timestamps {
+    tmp_subs_file
+        .write(&subtitles_data)
+        .context("failed to write subtitles to file")?;
+    let tmp_subs_path = tmp_subs_file.path().to_string_lossy();
+
+    let entries_with_timestamps = {
+        let subtitle_entries = get_random_timestamps(
+            subtitles
+                .get_subtitle_entries()
+                .context("failed to get subtitle entries")?,
+        );
+
+        // Take a subset of the subtitles
+        if let Some(c) = count {
+            let mut rng = rand::thread_rng();
+            subtitle_entries.choose_multiple(&mut rng, c)
+        } else {
+            subtitle_entries.collect::<Vec<_>>()
+        }
+    };
+
+    for (text, ts) in entries_with_timestamps {
         let mut path = output_dir.clone();
         path.push(format!(
             "{:03}-{:02}-{:03}.jpg",
@@ -54,9 +76,9 @@ pub fn save_screenshots(
             ts.msecs_comp(),
         ));
         let output_path = path.to_string_lossy();
-        let subtitles_arg = format!("subtitles='{}'", subtitles_path);
+        let subtitles_arg = format!("subtitles='{}'", tmp_subs_path);
 
-        slog::info!(log, "Saving screenshot"; "path" => %output_path);
+        slog::info!(log, "Saving screenshot"; "text" => &text, "path" => %output_path);
 
         let output = Command::new("ffmpeg")
             .args(&[
@@ -65,7 +87,7 @@ pub fn save_screenshots(
                 &format!("{}", ts.secs_f64()),
                 "-copyts",
                 "-i",
-                video,
+                video_path,
                 "-map",
                 "0:v",
                 "-vf",
@@ -92,16 +114,21 @@ pub fn save_screenshots(
 
 pub fn get_random_timestamps(
     subs: impl IntoIterator<Item = SubtitleEntry>,
-) -> impl Iterator<Item = TimePoint> {
+) -> impl Iterator<Item = (String, TimePoint)> {
     let mut rng = rand::thread_rng();
 
-    subs.into_iter().map(move |entry| {
-        let mut start = entry.timespan.start.msecs();
-        let mut end = entry.timespan.end.msecs();
-        if start > end {
-            std::mem::swap(&mut start, &mut end);
-        }
+    subs.into_iter().filter_map(move |entry| {
+        if let Some(line) = entry.line {
+            let mut start = entry.timespan.start.msecs();
+            let mut end = entry.timespan.end.msecs();
+            if start > end {
+                std::mem::swap(&mut start, &mut end);
+            }
+            let timepoint = TimePoint::from_msecs(rng.gen_range(start, end));
 
-        TimePoint::from_msecs(rng.gen_range(start, end))
+            Some((line, timepoint))
+        } else {
+            None
+        }
     })
 }

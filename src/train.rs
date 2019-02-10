@@ -37,8 +37,6 @@ fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
-// This has to be a macro for now because `subparse::parse_str` returns a private
-// type in its public interface: https://github.com/kaegi/subparse/issues/3
 pub fn get_subtitles(path: &str) -> Result<GenericSubtitleFile> {
     let format = subparse::get_subtitle_format_by_ending_err(path)
         .context("failed to determine subtitle format")?;
