@@ -1,4 +1,4 @@
-use rand::seq::IteratorRandom;
+use rand::seq::SliceRandom;
 use rand::Rng;
 use slog::Logger;
 use std::io::Write;
@@ -52,18 +52,25 @@ pub fn save_screenshots(
     let tmp_subs_path = tmp_subs_file.path().to_string_lossy();
 
     let entries_with_timestamps = {
-        let subtitle_entries = get_random_timestamps(
-            subtitles
-                .get_subtitle_entries()
-                .context("failed to get subtitle entries")?,
-        );
+        let subtitle_entries = subtitles
+            .get_subtitle_entries()
+            .context("failed to get subtitle entries")?;
+
+        let mut entries_with_ts = get_random_timestamps(subtitle_entries).collect::<Vec<_>>();
+
+        // Lines that occur in the same second will only get one screenshot
+        entries_with_ts.sort_unstable_by_key(|(_, t)| t.secs());
+        entries_with_ts.dedup_by_key(|(_, t)| t.secs());
 
         // Take a subset of the subtitles
         if let Some(c) = count {
             let mut rng = rand::thread_rng();
-            subtitle_entries.choose_multiple(&mut rng, c)
+            entries_with_ts
+                .choose_multiple(&mut rng, c)
+                .cloned()
+                .collect()
         } else {
-            subtitle_entries.collect::<Vec<_>>()
+            entries_with_ts
         }
     };
 
