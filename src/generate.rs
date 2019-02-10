@@ -12,7 +12,7 @@ pub fn generate_from_opts(
     args: opts::Generate,
     output: &mut impl Write,
 ) -> Result<()> {
-    let subtitle_file = match args.existing_subs {
+    let mut subtitle_file = match args.existing_subs {
         None => None,
         Some(path) => {
             slog::info!(log, "Loading subtitles from file"; "path" => &path);
@@ -25,7 +25,7 @@ pub fn generate_from_opts(
 
     generate(
         log,
-        subtitle_file,
+        subtitle_file.as_mut(),
         chain,
         args.start.as_ref().map(|s| s.as_ref()),
         args.count,
@@ -40,7 +40,7 @@ pub fn load_model(path: &str) -> Result<Chain<String>> {
 
 pub fn generate(
     log: &Logger,
-    subtitle_file: Option<GenericSubtitleFile>,
+    subtitle_file: Option<&mut GenericSubtitleFile>,
     chain: Chain<String>,
     start: Option<&str>,
     count: usize,
@@ -73,7 +73,7 @@ pub fn generate(
         output_lines.push(line)
     }
 
-    if let Some(mut file) = subtitle_file {
+    if let Some(file) = subtitle_file {
         for (mut sub, line) in subtitle_lines.iter_mut().zip(output_lines) {
             sub.line = Some(line);
         }

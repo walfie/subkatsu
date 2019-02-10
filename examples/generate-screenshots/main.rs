@@ -1,11 +1,10 @@
+mod ffmpeg;
 mod opts;
 
 use opts::Opts;
 use slog::{Drain, Logger};
-use std::process::Command;
 use structopt::StructOpt;
 use subkatsu::error::*;
-use subparse::SubtitleFormat;
 
 fn main() {
     // Logger initialization boilerplate
@@ -27,27 +26,10 @@ fn main() {
     }
 }
 
-fn get_subtitles_from_video(log: &Logger, path: &str) -> Result<(Vec<u8>, SubtitleFormat)> {
-    let output = Command::new("ffmpeg")
-        .args(&["-i", path, "-map", "0:s:0", "-f", "ass", "-"])
-        .output()
-        .context("ffmpeg command failed")?;
-
-    if !output.status.success() {
-        slog::error!(
-            log, "Failed to extract subtitles with ffmpeg";
-            "stderr" => %String::from_utf8_lossy(&output.stderr),
-            "stdout" => %String::from_utf8_lossy(&output.stdout)
-        );
-        return Err(Error::context("ffmpeg command failed"));
-    }
-
-    Ok((output.stdout, SubtitleFormat::SubStationAlpha))
-}
-
 fn run(log: &Logger) -> Result<()> {
     let opts = Opts::from_args();
 
+    // Get subtitles from specific subtitles file, or attempt to extract from video
     let (bytes, format) = match opts.subtitles {
         Some(path) => {
             let format = subparse::get_subtitle_format_by_ending_err(&path)
@@ -55,10 +37,14 @@ fn run(log: &Logger) -> Result<()> {
             let bytes = std::fs::read(&path).context("failed to read input subtitles file")?;
             (bytes, format)
         }
-        None => get_subtitles_from_video(log, &opts.video)?,
+        None => {
+            let path = &opts.video;
+            slog::info!(log, "Attempting to extract subtitles from video"; "path" => path);
+            ffmpeg::get_subtitles_from_video(log, path)?
+        }
     };
 
-    let subtitles_file = subparse::parse_str(
+    let mut subtitles_file = subparse::parse_str(
         format,
         &String::from_utf8(bytes).context("invalid UTF-8 in subtitles")?,
         24.0,
@@ -68,7 +54,7 @@ fn run(log: &Logger) -> Result<()> {
     let mut new_subs = Vec::new();
     subkatsu::generate(
         &log,
-        Some(subtitles_file),
+        Some(&mut subtitles_file),
         subkatsu::load_model(&opts.model)?,
         None,
         0, // Unused
