@@ -32,6 +32,7 @@ fn run(log: &Logger) -> Result<()> {
     // Get subtitles from specific subtitles file, or attempt to extract from video
     let (bytes, format) = match opts.subtitles {
         Some(path) => {
+            slog::info!(log, "Reading subtitles file"; "path" => &path);
             let format = subparse::get_subtitle_format_by_ending_err(&path)
                 .context("failed to determine subtitle format")?;
             let bytes = std::fs::read(&path).context("failed to read input subtitles file")?;

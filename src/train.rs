@@ -3,7 +3,9 @@ use crate::opts;
 use lazy_static::lazy_static;
 use regex::Regex;
 use slog::Logger;
+use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
 use subparse::{GenericSubtitleFile, SubtitleFile, SubtitleFormat};
@@ -104,6 +106,12 @@ fn iterate_files(
     })
 }
 
+fn hash<T: Hash>(obj: T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    obj.hash(&mut hasher);
+    hasher.finish()
+}
+
 pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     let mut chain = markov::Chain::of_order(args.order);
 
@@ -140,7 +148,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
             }
         };
 
-        // TODO: Don't error, just continue
+        // Don't quit the whole function on error, just continue
         let subs: Result<Vec<subparse::SubtitleEntry>> = (|| {
             Ok(get_subtitles(path, true)?
                 .get_subtitle_entries()
@@ -159,13 +167,25 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
             }
         };
 
+        let mut prev_tokens_hash = 0;
+
         for entry in subs {
             if let Some(line) = entry.line {
                 let line = escapes.replace_all(&line, "");
                 let line = spaces.replace_all(&line, " ");
 
                 let tokens = tokenize(&line);
-                chain.feed(tokens);
+                let tokens_hash = hash(&tokens);
+
+                // Sometimes lines are duplicated for typesetting purposes.
+                // E.g., for a typeset title, the subs may contain the title
+                // repeated 3 times but on different layers, each with different
+                // styles. In these cases, we don't want to put extra weight
+                // on these lines, so only feed them once.
+                if tokens_hash != prev_tokens_hash {
+                    prev_tokens_hash = tokens_hash;
+                    chain.feed(tokens);
+                }
             }
         }
 
