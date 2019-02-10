@@ -1,6 +1,6 @@
 use rand::Rng;
 use slog::Logger;
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use subkatsu::error::*;
@@ -48,13 +48,16 @@ pub fn save_screenshots(
     for ts in timestamps {
         let mut path = output_dir.clone();
         path.push(format!(
-            "{}-{:02}-{:03}.jpg",
+            "{:03}-{:02}-{:03}.jpg",
             ts.mins_comp(),
             ts.secs_comp(),
             ts.msecs_comp(),
         ));
+        let output_path = path.to_string_lossy();
 
-        let mut child = Command::new("ffmpeg")
+        slog::info!(log, "Saving screenshot"; "path" => %output_path);
+
+        let output = Command::new("ffmpeg")
             .args(&[
                 "-y",
                 "-ss",
@@ -68,24 +71,18 @@ pub fn save_screenshots(
                 &format!("subtitles='{}'", subtitles_path),
                 "-vframes",
                 "1",
-                path.to_string_lossy().as_ref(),
+                output_path.as_ref(),
             ])
-            .spawn()
-            .context("failed to spawn ffmpeg")?;
+            .output()
+            .context("failed to run ffmpeg")?;
 
-        if let Some(stderr) = child.stderr.take() {
-            for line in BufReader::new(stderr).lines() {
-                let line = line.context("failed to read stderr line from ffmpeg")?;
-                slog::info!(log, "{}", line; "stream" => "stderr", "process" => "ffmpeg");
-            }
-        }
-
-        let status = child.wait().context("failed to wait for ffmpeg")?;
-        if !status.success() {
-            if let Some(code) = status.code() {
-                slog::error!(log, "Received error code from ffmpeg"; "code" => code);
-            }
-            Err(Error::context("ffmpeg error"))?;
+        if !output.status.success() {
+            slog::error!(
+                log, "Failed to generate screenshots with ffmpeg";
+                "stderr" => %String::from_utf8_lossy(&output.stderr),
+                "stdout" => %String::from_utf8_lossy(&output.stdout)
+            );
+            return Err(Error::context("ffmpeg command failed"));
         }
     }
 

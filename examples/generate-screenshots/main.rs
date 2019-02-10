@@ -52,11 +52,14 @@ fn run(log: &Logger) -> Result<()> {
     )
     .context("failed to parse subtitles")?;
 
+    slog::info!(log, "Loading model from file"; "path" => &opts.model);
+    let model = subkatsu::load_model(&opts.model)?;
+
     let mut new_subs = Vec::new();
     subkatsu::generate(
         &log,
         Some(&mut subtitles_file),
-        subkatsu::load_model(&opts.model)?,
+        model,
         None,
         0, // Unused
         opts.min_length,
