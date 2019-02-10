@@ -61,15 +61,7 @@ pub fn generate(
     let mut output_lines = Vec::with_capacity(count);
 
     for _ in 0..count {
-        let mut line = generate_single(log, &chain, start)?;
-
-        if let Some(length) = min_length {
-            while line.chars().count() < length {
-                line.push(' ');
-                line.push_str(&generate_single(log, &chain, None)?);
-            }
-        }
-
+        let line = generate_min_length(log, &chain, start, min_length)?;
         output_lines.push(line)
     }
 
@@ -95,6 +87,24 @@ pub fn generate(
     }
 
     Ok(())
+}
+
+fn generate_min_length(
+    log: &Logger,
+    chain: &Chain<String>,
+    start_token: Option<&str>,
+    min_length: Option<usize>,
+) -> Result<String> {
+    let mut line = generate_single(log, &chain, start_token)?;
+
+    if let Some(length) = min_length {
+        while line.chars().count() < length {
+            line.push(' ');
+            line.push_str(&generate_single(log, &chain, None)?);
+        }
+    }
+
+    Ok(line)
 }
 
 fn generate_single(
