@@ -3,8 +3,10 @@ use crate::opts;
 use lazy_static::lazy_static;
 use regex::Regex;
 use slog::Logger;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
-use subparse::{GenericSubtitleFile, SubtitleFile};
+use subparse::{GenericSubtitleFile, SubtitleFile, SubtitleFormat};
 
 lazy_static! {
     static ref IS_CJK: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
@@ -37,12 +39,25 @@ fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
-pub fn get_subtitles(path: &str) -> Result<GenericSubtitleFile> {
+pub fn get_subtitles(path: &str, sanitize: bool) -> Result<GenericSubtitleFile> {
     let format = subparse::get_subtitle_format_by_ending_err(path)
         .context("failed to determine subtitle format")?;
 
-    // TODO: Remove `Comment: ` lines
-    let content = &std::fs::read_to_string(path).context("failed to read file")?;
+    let mut file = File::open(path).context("failed to read file")?;
+    let mut content = String::new();
+
+    if sanitize && format == SubtitleFormat::SubStationAlpha {
+        for line in BufReader::new(file).lines() {
+            let line = line.context("failed to read line")?;
+            if !line.starts_with("Comment: ") {
+                content.push_str(&line);
+                content.push('\n');
+            }
+        }
+    } else {
+        file.read_to_string(&mut content)
+            .context("failed to write line")?;
+    }
 
     subparse::parse_str(format, &content, 24.0).context("failed to parse subtitle file")
 }
@@ -127,7 +142,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
 
         // TODO: Don't error, just continue
         let subs: Result<Vec<subparse::SubtitleEntry>> = (|| {
-            Ok(get_subtitles(path)?
+            Ok(get_subtitles(path, true)?
                 .get_subtitle_entries()
                 .context("failed to get subtitle entries")?)
         })();

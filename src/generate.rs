@@ -3,6 +3,7 @@ use crate::opts;
 use lazy_static::lazy_static;
 use markov::Chain;
 use slog::Logger;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io::Write;
 use subparse::{GenericSubtitleFile, SubtitleFile};
@@ -16,7 +17,7 @@ pub fn generate_from_opts(
         None => None,
         Some(path) => {
             slog::info!(log, "Loading subtitles from file"; "path" => &path);
-            Some(crate::train::get_subtitles(&path)?)
+            Some(crate::train::get_subtitles(&path, true)?)
         }
     };
 
@@ -60,12 +61,20 @@ pub fn generate_subtitle_file(
         .get_subtitle_entries()
         .context("failed to parse subtitle entries")?;
 
-    for mut entry in subtitle_entries.iter_mut() {
-        if let Some(line) = &entry.line {
+    let mut generated: HashMap<String, String> = HashMap::new();
+
+    for mut subtitle in subtitle_entries.iter_mut() {
+        if let Some(line) = subtitle.line.take() {
             if !line.is_empty() {
-                entry.line = Some(generate_line(log, &chain, start, min_length)?);
-            } else {
-                entry.line = None;
+                match generated.entry(line) {
+                    Entry::Occupied(e) => {
+                        subtitle.line = Some(e.get().to_owned());
+                    }
+                    Entry::Vacant(e) => {
+                        let line = e.insert(generate_line(log, &chain, start, min_length)?);
+                        subtitle.line = Some(line.to_owned());
+                    }
+                }
             }
         }
     }
