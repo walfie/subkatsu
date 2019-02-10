@@ -39,4 +39,10 @@ pub struct Opts {
         help = "Save a screenshot for every line in the output subtitles"
     )]
     pub save_all: bool,
+
+    #[structopt(
+        long = "resolution-ms",
+        help = "Resolution in milliseconds. I.e., 200 means take a maximum of one screenshot every 200 ms"
+    )]
+    pub resolution_ms: Option<u32>,
 }

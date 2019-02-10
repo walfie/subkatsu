@@ -62,5 +62,6 @@ fn run(log: &Logger) -> Result<()> {
         &subtitles_file,
         &opts.output_dir,
         opts.count,
+        opts.resolution_ms,
     )
 }
