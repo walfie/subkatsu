@@ -2,6 +2,7 @@ mod ffmpeg;
 mod opts;
 
 use opts::Opts;
+use rand::seq::IteratorRandom;
 use slog::{Drain, Logger};
 use structopt::StructOpt;
 use subkatsu::error::*;
@@ -70,11 +71,18 @@ fn run(log: &Logger) -> Result<()> {
         .get_subtitle_entries()
         .context("failed to get subtitle entries")?;
 
+    let mut timestamps = ffmpeg::get_random_timestamps(subtitle_entries).collect::<Vec<_>>();
+
+    if let Some(count) = opts.count {
+        let mut rng = rand::thread_rng();
+        timestamps = timestamps.into_iter().choose_multiple(&mut rng, count);
+    }
+
     ffmpeg::save_screenshots(
         log,
         &opts.video,
         &new_subs,
-        ffmpeg::get_random_timestamps(subtitle_entries),
+        timestamps.into_iter(),
         &opts.output_dir,
     )
 }

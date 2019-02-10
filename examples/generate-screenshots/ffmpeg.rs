@@ -54,6 +54,7 @@ pub fn save_screenshots(
             ts.msecs_comp(),
         ));
         let output_path = path.to_string_lossy();
+        let subtitles_arg = format!("subtitles='{}'", subtitles_path);
 
         slog::info!(log, "Saving screenshot"; "path" => %output_path);
 
@@ -68,7 +69,7 @@ pub fn save_screenshots(
                 "-map",
                 "0:v",
                 "-vf",
-                &format!("subtitles='{}'", subtitles_path),
+                &subtitles_arg,
                 "-vframes",
                 "1",
                 output_path.as_ref(),

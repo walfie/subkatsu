@@ -24,4 +24,19 @@ pub struct Opts {
 
     #[structopt(long = "output-dir", help = "Path to save screenshots to")]
     pub output_dir: PathBuf,
+
+    #[structopt(
+        short = "n",
+        long = "count",
+        group = "screenshot_count",
+        help = "Number of screenshots to save"
+    )]
+    pub count: Option<usize>,
+
+    #[structopt(
+        long = "all",
+        group = "screenshot_count",
+        help = "Save a screenshot for every line in the output subtitles"
+    )]
+    pub save_all: bool,
 }
