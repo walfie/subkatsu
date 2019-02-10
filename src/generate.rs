@@ -67,7 +67,7 @@ pub fn generate_subtitle_file(
 
     for mut subtitle in subtitle_entries.iter_mut() {
         if let Some(line) = subtitle.line.take() {
-            if !line.is_empty() {
+            if !line.trim().is_empty() {
                 match generated.entry(tokenize(&line)) {
                     Entry::Occupied(e) => {
                         subtitle.line = Some(e.get().to_owned());
