@@ -17,11 +17,18 @@ pub struct Opts {
     pub video: String,
 
     #[structopt(
-        long = "subtitles",
+        long = "subtitles-ref",
         help = "Reference subtitle file (for timing/styles).\
-                If unspecified, will attempt to extract subtitles from the video file"
+                If unspecified, will attempt to extract subtitles from the video file."
     )]
-    pub subtitles: Option<String>,
+    pub subtitles_ref: Option<String>,
+
+    #[structopt(
+        long = "subtitles-out",
+        help = "Path to save the generated subtitles to. If unspecified, the file \
+                will be saved to a temp directory and removed after completion."
+    )]
+    pub subtitles_out: Option<String>,
 
     #[structopt(long = "output-dir", help = "Path to save screenshots to")]
     pub output_dir: PathBuf,

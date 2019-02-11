@@ -32,25 +32,31 @@ pub fn save_screenshots(
     video_path: &str,
     subtitles: &GenericSubtitleFile,
     output_dir: &PathBuf,
+    subtitles_out: Option<String>,
     count: Option<usize>,
     resolution_ms: u32,
 ) -> Result<()> {
-    let mut tmp_subs_file =
-        tempfile::NamedTempFile::new().context("failed to create temporary file")?;
+    let (mut subtitles_file, subtitles_file_path) = match subtitles_out {
+        Some(path) => {
+            let file = std::fs::File::create(&path).context("failed to create file")?;
+            (Box::new(file) as Box<std::io::Write>, path)
+        }
+        None => {
+            let file = tempfile::NamedTempFile::new().context("failed to create temporary file")?;
+            let path = file.path().to_string_lossy().to_string();
+            (Box::new(file) as Box<std::io::Write>, path)
+        }
+    };
 
-    slog::info!(
-        log, "Writing subtitles to temporary file";
-        "path" => %tmp_subs_file.path().to_string_lossy()
-    );
+    slog::info!(log, "Writing subtitles to file"; "path" => &subtitles_file_path);
 
     let subtitles_data = subtitles
         .to_data()
         .context("failed to serialize subtitle data")?;
 
-    tmp_subs_file
+    subtitles_file
         .write(&subtitles_data)
         .context("failed to write subtitles to file")?;
-    let tmp_subs_path = tmp_subs_file.path().to_string_lossy();
 
     let mut rng = rand::thread_rng();
     let entries_with_timestamps = {
@@ -93,7 +99,7 @@ pub fn save_screenshots(
             ts.msecs_comp(),
         ));
         let output_path = path.to_string_lossy();
-        let subtitles_arg = format!("subtitles='{}'", tmp_subs_path);
+        let subtitles_arg = format!("subtitles='{}'", subtitles_file_path);
 
         slog::info!(log, "Saving screenshot"; "text" => &text, "path" => %output_path);
 
