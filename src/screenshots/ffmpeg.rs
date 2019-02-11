@@ -93,10 +93,11 @@ pub fn save_screenshots(
     for (text, ts) in entries_with_timestamps {
         let mut path = output_dir.clone();
         path.push(format!(
-            "{:03}-{:02}-{:03}.jpg",
+            "{:03}-{:02}-{:03}_{}.jpg",
             ts.mins_comp(),
             ts.secs_comp(),
             ts.msecs_comp(),
+            base64::encode_config(&text, base64::URL_SAFE),
         ));
         let output_path = path.to_string_lossy();
         let subtitles_arg = format!("subtitles='{}'", subtitles_file_path);
