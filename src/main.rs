@@ -1,12 +1,6 @@
-#[macro_use]
-pub mod train;
-pub mod error;
-pub mod generate;
-pub mod opts;
-
-use opts::Opts;
 use slog::Drain;
 use structopt::StructOpt;
+use subkatsu::opts::Opts;
 
 fn main() {
     let decorator = slog_term::TermDecorator::new().build();
@@ -16,8 +10,8 @@ fn main() {
     let log = slog::Logger::root(drain, slog::o!());
 
     let result = match Opts::from_args() {
-        Opts::Train(args) => train::train(&log, args),
-        Opts::Generate(args) => generate::generate(&log, args),
+        Opts::Train(args) => subkatsu::train(&log, args),
+        Opts::Generate(args) => subkatsu::generate_from_opts(&log, args, &mut std::io::stdout()),
     };
 
     if let Err(err) = result {

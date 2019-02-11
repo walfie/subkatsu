@@ -1,65 +1,120 @@
 use crate::error::*;
 use crate::opts;
+use crate::train::tokenize;
 use lazy_static::lazy_static;
 use markov::Chain;
 use slog::Logger;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::io::{stdout, Write};
+use std::io::Write;
+use subparse::{GenericSubtitleFile, SubtitleFile};
 
-pub fn generate(log: &Logger, args: opts::Generate) -> Result<()> {
-    let (subtitle_file, mut subtitle_lines, count) = match args.existing_subs {
+pub fn generate_from_opts(
+    log: &Logger,
+    args: opts::Generate,
+    output: &mut impl Write,
+) -> Result<()> {
+    let subtitle_file = match args.existing_subs {
+        None => None,
         Some(path) => {
             slog::info!(log, "Loading subtitles from file"; "path" => &path);
-            let file = get_subtitles!(&path)?;
-            let entries = file
-                .get_subtitle_entries()
-                .context("failed to parse subtitle entries")?;
-            let n = entries.len();
-            (Some(file), entries, n)
+            Some(crate::train::get_subtitles_from_file(&path, true)?)
         }
-        None => (None, Vec::new(), args.count as usize),
     };
 
     slog::info!(log, "Loading model from file"; "path" => &args.model);
-    let chain: Chain<String> = Chain::load(&args.model).context("failed to load model file")?;
+    let chain = load_model(&args.model)?;
 
     let start = args.start.as_ref().map(|s| s.as_ref());
 
-    let mut output = Vec::with_capacity(count);
-
-    for _ in 0..count {
-        let mut line = generate_single(log, &chain, start)?;
-
-        if let Some(min_length) = args.min_length {
-            while line.chars().count() < min_length {
-                line.push(' ');
-                line.push_str(&generate_single(log, &chain, None)?);
-            }
-        }
-
-        output.push(line)
-    }
-
     if let Some(mut file) = subtitle_file {
-        for (mut sub, line) in subtitle_lines.iter_mut().zip(output) {
-            sub.line = Some(line);
-        }
-
-        file.update_subtitle_entries(&subtitle_lines)
-            .context("failed to update subtitle lines")?;
+        generate_subtitle_file(&log, &mut file, chain, start, args.min_length)?;
 
         let data = file
             .to_data()
             .context("failed to serialize subtitle data")?;
 
-        stdout().write(&data).context("failed to write to stdout")?;
+        output.write(&data).context("failed to write to output")?;
     } else {
-        for line in output {
-            println!("{}", line);
+        let lines = generate_lines(&log, chain, start, args.min_length);
+        for line in lines.take(args.count) {
+            output
+                .write(line?.as_ref())
+                .context("failed to write to output")?;
         }
     }
 
     Ok(())
+}
+
+pub fn load_model(path: &str) -> Result<Chain<String>> {
+    Chain::load(path).context("failed to load model file")
+}
+
+pub fn generate_subtitle_file(
+    log: &Logger,
+    subtitle_file: &mut GenericSubtitleFile,
+    chain: Chain<String>,
+    start: Option<&str>,
+    min_length: Option<usize>,
+) -> Result<()> {
+    let mut subtitle_entries = subtitle_file
+        .get_subtitle_entries()
+        .context("failed to parse subtitle entries")?;
+
+    // Lines that have the same tokenized output should get the same generated string
+    let mut generated: HashMap<Vec<String>, String> = HashMap::new();
+
+    for mut subtitle in subtitle_entries.iter_mut() {
+        if let Some(line) = subtitle.line.take() {
+            // `\pos` highly suggests the line was used for typesetting
+            // backgrounds/signs rather than dialogue
+            if line.trim().is_empty() || line.contains(r"\pos") {
+                subtitle.line = Some("".to_owned());
+            } else {
+                match generated.entry(tokenize(&line)) {
+                    Entry::Occupied(e) => {
+                        subtitle.line = Some(e.get().to_owned());
+                    }
+                    Entry::Vacant(e) => {
+                        let new_line = e.insert(generate_line(log, &chain, start, min_length)?);
+                        subtitle.line = Some(new_line.to_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    subtitle_file
+        .update_subtitle_entries(&subtitle_entries)
+        .context("failed to update subtitle lines")
+}
+
+pub fn generate_lines<'a>(
+    log: &'a Logger,
+    chain: Chain<String>,
+    start: Option<&'a str>,
+    min_length: Option<usize>,
+) -> impl Iterator<Item = Result<String>> + 'a {
+    std::iter::repeat_with(move || generate_line(log, &chain, start, min_length))
+}
+
+pub fn generate_line(
+    log: &Logger,
+    chain: &Chain<String>,
+    start_token: Option<&str>,
+    min_length: Option<usize>,
+) -> Result<String> {
+    let mut line = generate_single(log, &chain, start_token)?;
+
+    if let Some(length) = min_length {
+        while line.chars().count() < length {
+            line.push(' ');
+            line.push_str(&generate_single(log, &chain, None)?);
+        }
+    }
+
+    Ok(line)
 }
 
 fn generate_single(

@@ -3,9 +3,29 @@ use crate::opts;
 use lazy_static::lazy_static;
 use regex::Regex;
 use slog::Logger;
+use std::collections::hash_map::DefaultHasher;
+use std::fs::File;
+use std::hash::{Hash, Hasher};
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use subparse::{GenericSubtitleFile, SubtitleFile, SubtitleFormat};
 
 lazy_static! {
+    // {\c&H........&} changes color. If the alpha starts with F, the text
+    // is transparent, so we should exclude any text afterward, until the
+    // next color change, or end of line.
+    // TODO: Should probably stop trying to clean the subs in code, and
+    // just assume the subtitle files themselves are dialogue-only.
+    static ref ESCAPES: Regex = Regex::new(
+        r"(?x)                          # Whitespace-insignificant mode, for comments
+        ( \{.*\\c&H(F|f).(.{6})?&.*}.*(\{.*\\(c|r).+?}|$)
+        | \{.+?}                        # Anything between {}'s is a comment
+        )
+        ",
+    ).unwrap();
+
+    static ref SPACES: Regex = Regex::new(r"\\N|\\n|\\h|\n").unwrap();
+
     static ref IS_CJK: Regex = Regex::new(r"[\p{Hiragana}\p{Katakana}\p{Han}]").unwrap();
     static ref ENGLISH: Regex = Regex::new(r#"([^\s\w]+)?([a-zA-Z'-]+)([^\s\w]+?)?(")?"#).unwrap();
 }
@@ -14,11 +34,14 @@ pub fn is_cjk(text: &str) -> bool {
     IS_CJK.is_match(text)
 }
 
-fn tokenize(text: &str) -> Vec<String> {
+pub fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
 
-    if is_cjk(text) {
-        for token in tinysegmenter::tokenize(text) {
+    let text = ESCAPES.replace_all(&input, "");
+    let text = SPACES.replace_all(&text, " ");
+
+    if is_cjk(&text) {
+        for token in tinysegmenter::tokenize(&text) {
             match token.trim() {
                 "" => tokens.push(token),
                 s => tokens.push(s.to_owned()),
@@ -26,7 +49,7 @@ fn tokenize(text: &str) -> Vec<String> {
         }
     } else {
         // TODO: Case sensitivity?
-        for capture in ENGLISH.captures_iter(text) {
+        for capture in ENGLISH.captures_iter(&text) {
             for matched in capture.iter().skip(1).flatten() {
                 tokens.push(matched.as_str().to_owned());
             }
@@ -36,18 +59,37 @@ fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
-// This has to be a macro for now because `subparse::parse_str` returns a private
-// type in its public interface: https://github.com/kaegi/subparse/issues/3
-macro_rules! get_subtitles {
-    ( $path:expr ) => {{
-        let format = subparse::get_subtitle_format_by_ending_err($path)
-            .context("failed to determine subtitle format")?;
+pub fn get_subtitles_from_file(path: &str, sanitize: bool) -> Result<GenericSubtitleFile> {
+    let format = subparse::get_subtitle_format_by_ending_err(path)
+        .context("failed to determine subtitle format")?;
 
-        // TODO: Remove `Comment: ` lines
-        let content = &std::fs::read_to_string($path).context("failed to read file")?;
+    let mut file = File::open(path).context("failed to read file")?;
 
-        subparse::parse_str(format, &content, 24.0).context("failed to parse subtitle file")
-    }};
+    parse_subtitles(&mut file, format, sanitize)
+}
+
+pub fn parse_subtitles(
+    source: &mut (impl std::io::Read),
+    format: SubtitleFormat,
+    sanitize: bool,
+) -> Result<GenericSubtitleFile> {
+    let mut output = String::new();
+
+    if sanitize && format == SubtitleFormat::SubStationAlpha {
+        for line in BufReader::new(source).lines() {
+            let line = line.context("failed to read line")?;
+            if !line.starts_with("Comment: ") {
+                output.push_str(&line);
+                output.push('\n');
+            }
+        }
+    } else {
+        source
+            .read_to_string(&mut output)
+            .context("failed to write line")?;
+    }
+
+    subparse::parse_str(format, &output, 24.0).context("failed to parse subtitle file")
 }
 
 fn iterate_files(
@@ -92,24 +134,15 @@ fn iterate_files(
     })
 }
 
+fn hash<T: Hash>(obj: T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    obj.hash(&mut hasher);
+    hasher.finish()
+}
+
 pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     let mut chain = markov::Chain::of_order(args.order);
 
-    // {\c&H........&} changes color. If the alpha starts with F, the text
-    // is transparent, so we should exclude any text afterward, until the
-    // next color change, or end of line.
-    // TODO: Should probably stop trying to clean the subs in code, and
-    // just assume the subtitle files themselves are dialogue-only.
-    let escapes = Regex::new(
-        r"(?x)                          # Whitespace-insignificant mode, for comments
-        ( \{.*\\c&H(F|f).(.{6})?&.*}.*(\{.*\\(c|r).+?}|$)
-        | \{.+?}                        # Anything between {}'s is a comment
-        )
-        ",
-    )
-    .unwrap();
-
-    let spaces = Regex::new(r"\\N|\\n|\\h|\n").unwrap();
     let recursive = args.recursive;
 
     let paths = args
@@ -128,9 +161,9 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
             }
         };
 
-        // TODO: Don't error, just continue
+        // Don't quit the whole function on error, just continue
         let subs: Result<Vec<subparse::SubtitleEntry>> = (|| {
-            Ok(get_subtitles!(path)?
+            Ok(get_subtitles_from_file(path, true)?
                 .get_subtitle_entries()
                 .context("failed to get subtitle entries")?)
         })();
@@ -147,13 +180,22 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
             }
         };
 
+        let mut prev_tokens_hash = 0;
+
         for entry in subs {
             if let Some(line) = entry.line {
-                let line = escapes.replace_all(&line, "");
-                let line = spaces.replace_all(&line, " ");
-
                 let tokens = tokenize(&line);
-                chain.feed(tokens);
+                let tokens_hash = hash(&tokens);
+
+                // Sometimes lines are duplicated for typesetting purposes.
+                // E.g., for a typeset title, the subs may contain the title
+                // repeated 3 times but on different layers, each with different
+                // styles. In these cases, we don't want to put extra weight
+                // on these lines, so only feed them once.
+                if tokens_hash != prev_tokens_hash {
+                    prev_tokens_hash = tokens_hash;
+                    chain.feed(tokens);
+                }
             }
         }
 

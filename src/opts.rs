@@ -56,7 +56,7 @@ pub struct Generate {
         default_value = "25",
         help = "Number of chains to generate"
     )]
-    pub count: u32,
+    pub count: usize,
 
     #[structopt(
         long = "start-token",
