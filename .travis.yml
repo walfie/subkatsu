@@ -1,0 +1,69 @@
+# Based on the "trust" template v0.1.2
+# https://github.com/japaric/trust/tree/v0.1.2
+
+dist: trusty
+language: rust
+services: docker
+sudo: required
+
+env:
+  global:
+    - CRATE_NAME=subkatsu
+    - EXECUTABLE_NAME=subkatsu
+
+matrix:
+  include:
+    # Linux
+    - env: TARGET=i686-unknown-linux-musl
+    - env: TARGET=x86_64-unknown-linux-musl
+
+    # OSX
+    - env: TARGET=x86_64-apple-darwin
+      os: osx
+
+before_install:
+  - set -e
+  - rustup self update
+  - rustup component add rustfmt-preview
+
+install:
+  - sh ci/install.sh
+  - source ~/.cargo/env || true
+
+script:
+  - bash ci/script.sh
+
+after_script: set +e
+
+before_deploy:
+  - sh ci/before_deploy.sh
+
+deploy:
+  # `api_key.secure` is obtained as follows:
+  # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
+  # - Encrypt it: `travis encrypt 0123456789012345678901234567890123456789`
+  # - Paste the output down here
+  api_key:
+    secure: "lISdn8/2hHbulQ+piMf3bmUuEsiJd/vR184JskjxE2lxZS0yquVBp/tDFYpWc9KKg5RenPNv717mishcDvso1ciW8pK1Vk6zoZSgfBEXhPXrTDrDEsQOR3QjiHmETCvvPNaxeYYDFEwj/KoI19iKkIWPvD2ImZBaP46m15Dybz/hFXin8f0hk85jkPgP753bqWyEhMHRzZF2g4Ka/GI0hrCxptZf6yeRO4aYCAuxgORWjdsT6JLbOnel3wK3pSxIHg3jF0IlZPtVletNFWrzot/kDSZI3SdRDFbSzjT9lX9RGYdcqhknibo4P4GKRZZ8nOQUdBJdaXAlU0mJ+xVbX4+uZ/+617yr7BLZdbOAmON7R8IZ+9/nnyGz08ddgDM9U2isGwg6yxlE9t71MksJxzcDX587VCacsJPstJ5tu903JtWtJ2V6yBF+uUu9xIqeenmPT9qocuJg5wCqV2A3UanDj2IE/vs+krajUycmA4sHBCr2q50WfsQbgNnjQg4g3FczdcxKedHv29wwfkXZQ6//WaV4x2SUKzsukei02svlFHsRaJvRg4kTmiC1qsbmW96Rm2Rw5FnqFd9h65RJUl/WODE1o1Pr5GPCeeHWCWmFfqJPaCFhAIISxZCCUaIK3ZybNZtL0s7UDQy6QfpD4oEc8QRBPUhiKgBTY2AE1g4="
+  file_glob: true
+  file: $CRATE_NAME-$TRAVIS_TAG-$TARGET.*
+  on:
+    condition: $TRAVIS_RUST_VERSION = stable
+    tags: true
+  provider: releases
+  skip_cleanup: true
+
+cache: cargo
+before_cache:
+  # Travis can't cache files that are not readable by "others"
+  - chmod -R a+r $HOME/.cargo
+
+branches:
+  only:
+    # Release tags (e.g. "v1.2.3" or "1.2.3")
+    - /^v?\d+\.\d+\.\d+.*$/
+    - master
+
+notifications:
+  email:
+    on_success: never
