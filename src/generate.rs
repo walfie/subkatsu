@@ -18,7 +18,7 @@ pub fn generate_from_opts(
         None => None,
         Some(path) => {
             slog::info!(log, "Loading subtitles from file"; "path" => &path);
-            Some(crate::train::get_subtitles(&path, true)?)
+            Some(crate::train::get_subtitles_from_file(&path, true)?)
         }
     };
 
@@ -67,14 +67,18 @@ pub fn generate_subtitle_file(
 
     for mut subtitle in subtitle_entries.iter_mut() {
         if let Some(line) = subtitle.line.take() {
-            if !line.trim().is_empty() {
+            // `\pos` highly suggests the line was used for typesetting
+            // backgrounds/signs rather than dialogue
+            if line.trim().is_empty() || line.contains(r"\pos") {
+                subtitle.line = Some("".to_owned());
+            } else {
                 match generated.entry(tokenize(&line)) {
                     Entry::Occupied(e) => {
                         subtitle.line = Some(e.get().to_owned());
                     }
                     Entry::Vacant(e) => {
-                        let line = e.insert(generate_line(log, &chain, start, min_length)?);
-                        subtitle.line = Some(line.to_owned());
+                        let new_line = e.insert(generate_line(log, &chain, start, min_length)?);
+                        subtitle.line = Some(new_line.to_owned());
                     }
                 }
             }

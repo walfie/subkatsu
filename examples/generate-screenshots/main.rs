@@ -45,12 +45,7 @@ fn run(log: &Logger) -> Result<()> {
         }
     };
 
-    let mut subtitles = subparse::parse_str(
-        format,
-        &String::from_utf8(bytes).context("invalid UTF-8 in subtitles")?,
-        24.0,
-    )
-    .context("failed to parse subtitles")?;
+    let mut subtitles = subkatsu::parse_subtitles(&mut bytes.as_slice(), format, true)?;
 
     slog::info!(log, "Loading model from file"; "path" => &opts.model);
     let model = subkatsu::load_model(&opts.model)?;

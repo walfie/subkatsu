@@ -6,7 +6,7 @@ use slog::Logger;
 use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use subparse::{GenericSubtitleFile, SubtitleFile, SubtitleFormat};
 
@@ -59,27 +59,37 @@ pub fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
-pub fn get_subtitles(path: &str, sanitize: bool) -> Result<GenericSubtitleFile> {
+pub fn get_subtitles_from_file(path: &str, sanitize: bool) -> Result<GenericSubtitleFile> {
     let format = subparse::get_subtitle_format_by_ending_err(path)
         .context("failed to determine subtitle format")?;
 
     let mut file = File::open(path).context("failed to read file")?;
-    let mut content = String::new();
+
+    parse_subtitles(&mut file, format, sanitize)
+}
+
+pub fn parse_subtitles(
+    source: &mut (impl std::io::Read),
+    format: SubtitleFormat,
+    sanitize: bool,
+) -> Result<GenericSubtitleFile> {
+    let mut output = String::new();
 
     if sanitize && format == SubtitleFormat::SubStationAlpha {
-        for line in BufReader::new(file).lines() {
+        for line in BufReader::new(source).lines() {
             let line = line.context("failed to read line")?;
             if !line.starts_with("Comment: ") {
-                content.push_str(&line);
-                content.push('\n');
+                output.push_str(&line);
+                output.push('\n');
             }
         }
     } else {
-        file.read_to_string(&mut content)
+        source
+            .read_to_string(&mut output)
             .context("failed to write line")?;
     }
 
-    subparse::parse_str(format, &content, 24.0).context("failed to parse subtitle file")
+    subparse::parse_str(format, &output, 24.0).context("failed to parse subtitle file")
 }
 
 fn iterate_files(
@@ -153,7 +163,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
 
         // Don't quit the whole function on error, just continue
         let subs: Result<Vec<subparse::SubtitleEntry>> = (|| {
-            Ok(get_subtitles(path, true)?
+            Ok(get_subtitles_from_file(path, true)?
                 .get_subtitle_entries()
                 .context("failed to get subtitle entries")?)
         })();
