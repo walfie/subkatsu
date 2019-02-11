@@ -1,10 +1,10 @@
+use crate::error::*;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use slog::Logger;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use subkatsu::error::*;
 use subparse::timetypes::TimePoint;
 use subparse::{GenericSubtitleFile, SubtitleFile};
 use subparse::{SubtitleEntry, SubtitleFormat};

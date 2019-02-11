@@ -12,6 +12,7 @@ fn main() {
     let result = match Opts::from_args() {
         Opts::Train(args) => subkatsu::train(&log, args),
         Opts::Generate(args) => subkatsu::generate_from_opts(&log, args, &mut std::io::stdout()),
+        Opts::Screenshots(args) => subkatsu::generate_screenshots(&log, args),
     };
 
     if let Err(err) = result {

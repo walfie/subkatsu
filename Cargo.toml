@@ -13,6 +13,8 @@ slog = "2.4.1"
 slog-term = "2.4.0"
 slog-async = "2.3.0"
 walkdir = "2.2.7"
+rand = "0.6.5"
+tempfile = "3.0.6"
 
 [dependencies.subparse]
 git = "https://github.com/walfie/subparse.git"
@@ -22,8 +24,4 @@ rev = "12fa1f4d9e6e72ad3205f5e1019f1c2527d65f6b"
 version = "1.0"
 default-features = false
 features = ["yaml"]
-
-[dev-dependencies]
-rand = "0.6.5"
-tempfile = "3.0.6"
 
