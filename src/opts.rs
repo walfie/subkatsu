@@ -122,6 +122,13 @@ pub struct Screenshots {
     pub output_dir: PathBuf,
 
     #[structopt(
+        long = "prefix",
+        default_value = "",
+        help = "Prefix for screenshot file names"
+    )]
+    pub prefix: String,
+
+    #[structopt(
         short = "n",
         long = "count",
         group = "screenshot_count",

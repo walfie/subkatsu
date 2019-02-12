@@ -1,13 +1,13 @@
 use crate::error::*;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use serde_derive::Serialize;
 use slog::Logger;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use subparse::timetypes::TimePoint;
-use subparse::{GenericSubtitleFile, SubtitleFile};
-use subparse::{SubtitleEntry, SubtitleFormat};
+use subparse::{GenericSubtitleFile, SubtitleEntry, SubtitleFile, SubtitleFormat};
 
 pub fn get_subtitles_from_video(log: &Logger, path: &str) -> Result<(Vec<u8>, SubtitleFormat)> {
     let output = Command::new("ffmpeg")
@@ -27,10 +27,19 @@ pub fn get_subtitles_from_video(log: &Logger, path: &str) -> Result<(Vec<u8>, Su
     Ok((output.stdout, SubtitleFormat::SubStationAlpha))
 }
 
+#[derive(Serialize)]
+struct ScreenshotData<'a> {
+    source: &'a str,
+    timestamp_ms: i64,
+    path: &'a str,
+    text: &'a str,
+}
+
 pub fn save_screenshots(
     log: &Logger,
     video_path: &str,
     subtitles: &GenericSubtitleFile,
+    prefix: &str,
     output_dir: &PathBuf,
     subtitles_out: Option<String>,
     count: Option<usize>,
@@ -93,11 +102,11 @@ pub fn save_screenshots(
     for (text, ts) in entries_with_timestamps {
         let mut path = output_dir.clone();
         path.push(format!(
-            "{:03}-{:02}-{:03}_{}.jpg",
+            "{}{:03}-{:02}-{:03}.jpg",
+            prefix,
             ts.mins_comp(),
             ts.secs_comp(),
-            ts.msecs_comp(),
-            base64::encode_config(&text, base64::URL_SAFE),
+            ts.msecs_comp()
         ));
         let output_path = path.to_string_lossy();
         let subtitles_arg = format!("subtitles='{}'", subtitles_file_path);
@@ -131,6 +140,18 @@ pub fn save_screenshots(
             );
             return Err(Error::context("ffmpeg command failed"));
         }
+
+        // TODO: This is incredibly hacky and should not be printed here
+        println!(
+            "{}",
+            serde_json::to_string(&ScreenshotData {
+                source: video_path,
+                timestamp_ms: ts.msecs(),
+                path: output_path.as_ref(),
+                text: &text
+            })
+            .context("failed to serialize output")?
+        );
     }
 
     Ok(())

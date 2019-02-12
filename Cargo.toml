@@ -15,7 +15,9 @@ slog-async = "2.3.0"
 walkdir = "2.2.7"
 rand = "0.6.5"
 tempfile = "3.0.6"
-base64 = "0.10.1"
+serde_json = "1"
+serde = "1"
+serde_derive = "1"
 
 [dependencies.subparse]
 git = "https://github.com/walfie/subparse.git"
