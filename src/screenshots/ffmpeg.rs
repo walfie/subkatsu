@@ -100,14 +100,32 @@ pub fn save_screenshots(
     };
 
     for (text, ts) in entries_with_timestamps {
-        let mut path = output_dir.clone();
-        path.push(format!(
-            "{}{:03}-{:02}-{:03}.jpg",
-            prefix,
-            ts.mins_comp(),
-            ts.secs_comp(),
-            ts.msecs_comp()
-        ));
+        let path = {
+            let mut path = output_dir.clone();
+            let mut filename = format!(
+                "{}{:03}-{:02}-{:03}_",
+                prefix,
+                ts.mins_comp(),
+                ts.secs_comp(),
+                ts.msecs_comp()
+            );
+
+            let filename_suffix = base64::encode_config(&text, base64::URL_SAFE);
+
+            // Max filename length is 255 on most systems. Attempt to fit the Base64-encoded text
+            // in the filename, and if it fails, just encode an empty string.
+            // TODO: This is such a hack
+            if filename.len() + filename_suffix.len() > 240 {
+                filename.push_str(&base64::encode_config("", base64::URL_SAFE));
+            } else {
+                filename.push_str(&filename_suffix);
+            }
+
+            path.push(filename);
+            path.set_extension("jpg");
+            path
+        };
+
         let output_path = path.to_string_lossy();
         let subtitles_arg = format!("subtitles='{}'", subtitles_file_path);
 

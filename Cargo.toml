@@ -18,6 +18,7 @@ tempfile = "3.0.6"
 serde_json = "1"
 serde = "1"
 serde_derive = "1"
+base64 = "0.10.1"
 
 [dependencies.subparse]
 git = "https://github.com/walfie/subparse.git"
