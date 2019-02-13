@@ -32,7 +32,7 @@ pub fn generate_screenshots(log: &Logger, opts: Screenshots) -> Result<()> {
         log,
         &opts.video,
         &subtitles,
-        &opts.prefix,
+        &opts.format,
         &opts.output_dir,
         opts.subtitles_out,
         opts.count,

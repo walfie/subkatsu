@@ -39,7 +39,7 @@ pub fn save_screenshots(
     log: &Logger,
     video_path: &str,
     subtitles: &GenericSubtitleFile,
-    prefix: &str,
+    filename_format: &str,
     output_dir: &PathBuf,
     subtitles_out: Option<String>,
     count: Option<usize>,
@@ -102,24 +102,24 @@ pub fn save_screenshots(
     for (text, ts) in entries_with_timestamps {
         let path = {
             let mut path = output_dir.clone();
-            let mut filename = format!(
-                "{}{:03}-{:02}-{:03}_",
-                prefix,
-                ts.mins_comp(),
-                ts.secs_comp(),
-                ts.msecs_comp()
-            );
 
-            let filename_suffix = base64::encode_config(&text, base64::URL_SAFE);
+            let mut filename = filename_format
+                .replace("%H", &(ts.mins_comp() / 60).to_string())
+                .replace("%M", &format!("{:02}", ts.mins_comp() % 60))
+                .replace("%S", &format!("{:02}", ts.secs_comp()))
+                .replace("%m", &ts.msecs().to_string())
+                .replace("%f", &format!("{:03}", ts.msecs_comp()));
+
+            let encoded_text = base64::encode_config(&text, base64::URL_SAFE);
 
             // Max filename length is 255 on most systems. Attempt to fit the Base64-encoded text
             // in the filename, and if it fails, just encode an empty string.
             // TODO: This is such a hack
-            if filename.len() + filename_suffix.len() > 240 {
-                filename.push_str(&base64::encode_config("", base64::URL_SAFE));
+            filename = if filename.len() + encoded_text.len() > 240 {
+                filename.replace("%t", &base64::encode_config("", base64::URL_SAFE))
             } else {
-                filename.push_str(&filename_suffix);
-            }
+                filename.replace("%t", &encoded_text)
+            };
 
             path.push(filename);
             path.set_extension("jpg");

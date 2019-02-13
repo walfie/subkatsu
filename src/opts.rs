@@ -122,11 +122,13 @@ pub struct Screenshots {
     pub output_dir: PathBuf,
 
     #[structopt(
-        long = "prefix",
-        default_value = "",
-        help = "Prefix for screenshot file names"
+        long = "format",
+        default_value = "%H%M%S%f_%t",
+        help = "Screenshot file name format. \
+                %H hours / %M minutes / %S seconds / \
+                %f seconds fraction / %m total milliseconds / %t Base64 encoded text"
     )]
-    pub prefix: String,
+    pub format: String,
 
     #[structopt(
         short = "n",
