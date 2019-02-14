@@ -1,0 +1,11 @@
+# This file contains settings for the `cargo release` plugin:
+# https://github.com/sunng87/cargo-release
+
+tag-message = "Release version {{version}} (cargo-release)"
+
+pre-release-commit-message = "Release version {{version}} (cargo-release)"
+pro-release-commit-message = "Set version to {{version}} for development (cargo-release)"
+
+# Ensure we're on master before attempting to release
+pre-release-hook = ["git", "checkout", "master"]
+
