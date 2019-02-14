@@ -1,6 +1,9 @@
 # This file contains settings for the `cargo release` plugin:
 # https://github.com/sunng87/cargo-release
 
+upload-doc = false
+
+tag-prefix = ""
 tag-message = "Release version {{version}} (cargo-release)"
 
 pre-release-commit-message = "Release version {{version}} (cargo-release)"
