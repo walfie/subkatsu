@@ -13,7 +13,7 @@ pub fn get_subtitles_from_video(log: &Logger, path: &str) -> Result<(Vec<u8>, Su
     let output = Command::new("ffmpeg")
         .args(&["-i", path, "-map", "0:s:0", "-f", "ass", "-"])
         .output()
-        .context("ffmpeg command failed")?;
+        .context(|| "ffmpeg command failed")?;
 
     if !output.status.success() {
         slog::error!(
@@ -47,11 +47,12 @@ pub fn save_screenshots(
 ) -> Result<()> {
     let (mut subtitles_file, subtitles_file_path) = match subtitles_out {
         Some(path) => {
-            let file = std::fs::File::create(&path).context("failed to create file")?;
+            let file = std::fs::File::create(&path).context(|| "failed to create file")?;
             (Box::new(file) as Box<std::io::Write>, path)
         }
         None => {
-            let file = tempfile::NamedTempFile::new().context("failed to create temporary file")?;
+            let file =
+                tempfile::NamedTempFile::new().context(|| "failed to create temporary file")?;
             let path = file.path().to_string_lossy().to_string();
             (Box::new(file) as Box<std::io::Write>, path)
         }
@@ -61,17 +62,17 @@ pub fn save_screenshots(
 
     let subtitles_data = subtitles
         .to_data()
-        .context("failed to serialize subtitle data")?;
+        .context(|| "failed to serialize subtitle data")?;
 
     subtitles_file
         .write(&subtitles_data)
-        .context("failed to write subtitles to file")?;
+        .context(|| "failed to write subtitles to file")?;
 
     let mut rng = rand::thread_rng();
     let entries_with_timestamps = {
         let mut subtitle_entries = subtitles
             .get_subtitle_entries()
-            .context("failed to get subtitle entries")?;
+            .context(|| "failed to get subtitle entries")?;
 
         let resolution_ms = resolution_ms as i64;
         if resolution_ms > 0 {
@@ -148,7 +149,7 @@ pub fn save_screenshots(
                 output_path.as_ref(),
             ])
             .output()
-            .context("failed to run ffmpeg")?;
+            .context(|| "failed to run ffmpeg")?;
 
         if !output.status.success() {
             slog::error!(
@@ -168,7 +169,7 @@ pub fn save_screenshots(
                 path: output_path.as_ref(),
                 text: &text
             })
-            .context("failed to serialize output")?
+            .context(|| "failed to serialize output")?
         );
     }
 

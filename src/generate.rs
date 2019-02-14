@@ -32,15 +32,17 @@ pub fn generate_from_opts(
 
         let data = file
             .to_data()
-            .context("failed to serialize subtitle data")?;
+            .context(|| "failed to serialize subtitle data")?;
 
-        output.write(&data).context("failed to write to output")?;
+        output
+            .write(&data)
+            .context(|| "failed to write to output")?;
     } else {
         let lines = generate_lines(&log, chain, start, args.min_length);
         for line in lines.take(args.count) {
             output
                 .write(line?.as_ref())
-                .context("failed to write to output")?;
+                .context(|| "failed to write to output")?;
         }
     }
 
@@ -48,7 +50,7 @@ pub fn generate_from_opts(
 }
 
 pub fn load_model(path: &str) -> Result<Chain<String>> {
-    Chain::load(path).context("failed to load model file")
+    Chain::load(path).context(|| "failed to load model file")
 }
 
 pub fn generate_subtitle_file(
@@ -60,7 +62,7 @@ pub fn generate_subtitle_file(
 ) -> Result<()> {
     let mut subtitle_entries = subtitle_file
         .get_subtitle_entries()
-        .context("failed to parse subtitle entries")?;
+        .context(|| "failed to parse subtitle entries")?;
 
     // Lines that have the same tokenized output should get the same generated string
     let mut generated: HashMap<Vec<String>, String> = HashMap::new();
@@ -87,7 +89,7 @@ pub fn generate_subtitle_file(
 
     subtitle_file
         .update_subtitle_entries(&subtitle_entries)
-        .context("failed to update subtitle lines")
+        .context(|| "failed to update subtitle lines")
 }
 
 pub fn generate_lines<'a>(
@@ -149,7 +151,7 @@ fn generate_single(
         .chain(generated.into_iter())
         .chain(post.into_iter().rev().map(String::from));
 
-    write_tokens(tokens_iter, &mut output).context("failed to write tokens to output")?;
+    write_tokens(tokens_iter, &mut output).context(|| "failed to write tokens to output")?;
 
     // TODO: This seems kinda hacky
     if output.ends_with(" \"\"") {

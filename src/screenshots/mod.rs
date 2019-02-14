@@ -10,8 +10,8 @@ pub fn generate_screenshots(log: &Logger, opts: Screenshots) -> Result<()> {
         Some(path) => {
             slog::info!(log, "Reading subtitles file"; "path" => &path);
             let format = subparse::get_subtitle_format_by_ending_err(&path)
-                .context("failed to determine subtitle format")?;
-            let bytes = std::fs::read(&path).context("failed to read input subtitles file")?;
+                .context(|| "failed to determine subtitle format")?;
+            let bytes = std::fs::read(&path).context(|| "failed to read input subtitles file")?;
             (bytes, format)
         }
         None => {

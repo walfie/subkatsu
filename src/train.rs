@@ -61,9 +61,9 @@ pub fn tokenize(input: &str) -> Vec<String> {
 
 pub fn get_subtitles_from_file(path: &str, sanitize: bool) -> Result<GenericSubtitleFile> {
     let format = subparse::get_subtitle_format_by_ending_err(path)
-        .context("failed to determine subtitle format")?;
+        .context(|| "failed to determine subtitle format")?;
 
-    let mut file = File::open(path).context("failed to read file")?;
+    let mut file = File::open(path).context(|| "failed to read file")?;
 
     parse_subtitles(&mut file, format, sanitize)
 }
@@ -77,7 +77,7 @@ pub fn parse_subtitles(
 
     if sanitize && format == SubtitleFormat::SubStationAlpha {
         for line in BufReader::new(source).lines() {
-            let line = line.context("failed to read line")?;
+            let line = line.context(|| "failed to read line")?;
             if !line.starts_with("Comment: ") {
                 output.push_str(&line);
                 output.push('\n');
@@ -86,10 +86,10 @@ pub fn parse_subtitles(
     } else {
         source
             .read_to_string(&mut output)
-            .context("failed to write line")?;
+            .context(|| "failed to write line")?;
     }
 
-    subparse::parse_str(format, &output, 24.0).context("failed to parse subtitle file")
+    subparse::parse_str(format, &output, 24.0).context(|| "failed to parse subtitle file")
 }
 
 fn iterate_files(
@@ -165,7 +165,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
         let subs: Result<Vec<subparse::SubtitleEntry>> = (|| {
             Ok(get_subtitles_from_file(path, true)?
                 .get_subtitle_entries()
-                .context("failed to get subtitle entries")?)
+                .context(|| "failed to get subtitle entries")?)
         })();
 
         let subs = match subs {
@@ -215,7 +215,7 @@ pub fn train(log: &Logger, args: opts::Train) -> Result<()> {
     slog::info!(log, "Saving model to file"; "path" => &args.output);
     chain
         .save(&args.output)
-        .context("failed to save model file")?;
+        .context(|| "failed to save model file")?;
 
     Ok(())
 }

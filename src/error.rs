@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -5,12 +6,15 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
-    pub context: String,
+    pub context: Cow<'static, str>,
     pub cause: Option<Box<StdError + 'static>>,
 }
 
 impl Error {
-    pub fn context<S: Into<String>>(text: S) -> Self {
+    pub fn context<S>(text: S) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         Error {
             context: text.into(),
             cause: None,
@@ -60,16 +64,23 @@ impl<'a> Iterator for ErrorIter<'a> {
 }
 
 pub trait ResultExt<T> {
-    fn context<S: Into<String>>(self, message: S) -> Result<T>;
+    fn context<F, S>(self, to_message: F) -> Result<T>
+    where
+        F: FnOnce() -> S,
+        S: Into<Cow<'static, str>>;
 }
 
 impl<T, E> ResultExt<T> for std::result::Result<T, E>
 where
     E: StdError + 'static,
 {
-    fn context<S: Into<String>>(self, message: S) -> Result<T> {
+    fn context<F, S>(self, to_message: F) -> Result<T>
+    where
+        F: FnOnce() -> S,
+        S: Into<Cow<'static, str>>,
+    {
         self.map_err(|e| Error {
-            context: message.into(),
+            context: to_message().into(),
             cause: Some(e.into()),
         })
     }
