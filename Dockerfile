@@ -2,8 +2,6 @@ FROM clux/muslrust:1.32.0-stable as builder
 
 COPY . /workspace
 RUN set -x \
-  && ls -lR /workspace \
-  && false \
   && curl -Lfo /tmp/NotoSansCJKjp-Medium.otf \
      "https://github.com/googlei18n/noto-cjk/blob/master/NotoSansCJKjp-Medium.otf?raw=true" \
   && cd /workspace \
