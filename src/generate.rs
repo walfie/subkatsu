@@ -3,6 +3,7 @@ use crate::opts;
 use crate::train::tokenize;
 use lazy_static::lazy_static;
 use markov::Chain;
+use regex::Regex;
 use slog::Logger;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -53,6 +54,12 @@ pub fn load_model(path: &str) -> Result<Chain<String>> {
     Chain::load(path).context(|| "failed to load model file")
 }
 
+lazy_static! {
+    // These escape codes highly suggest the line was used for typesetting
+    // backgrounds/signs rather than dialogue
+    static ref TYPESETTING: Regex = Regex::new(r#"(\\pos|\\blur|\\clip)"#).unwrap();
+}
+
 pub fn generate_subtitle_file(
     log: &Logger,
     subtitle_file: &mut GenericSubtitleFile,
@@ -69,9 +76,8 @@ pub fn generate_subtitle_file(
 
     for mut subtitle in subtitle_entries.iter_mut() {
         if let Some(line) = subtitle.line.take() {
-            // `\pos` highly suggests the line was used for typesetting
-            // backgrounds/signs rather than dialogue
-            if line.trim().is_empty() || line.contains(r"\pos") {
+            // Remove lines that are empty or are for fancy typesetting
+            if line.trim().is_empty() || TYPESETTING.is_match(&line) {
                 subtitle.line = Some("".to_owned());
             } else {
                 match generated.entry(tokenize(&line)) {
