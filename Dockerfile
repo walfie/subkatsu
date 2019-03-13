@@ -8,7 +8,7 @@ RUN set -x \
   && cargo build --release \
   && mv /workspace/target/*/release /out
 
-FROM jrottenberg/ffmpeg:4.1-scratch
+FROM jrottenberg/ffmpeg:4.1-alpine
 
 # Copy over Noto Sans so we have a good fallback font for CJK
 COPY --from=builder /tmp/NotoSansCJKjp-Medium.otf /usr/share/fonts/
